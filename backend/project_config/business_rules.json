@@ -1,0 +1,24 @@
+{
+  "contract-type": {
+    "nominator": { 
+      "_cmt" :"노미네이터는 국내/해외 여부에 따라서만 가격 바뀌며, 이외 전체 동일함",
+        "gross_amount": {
+        "domestic": 400000,
+        "overseas": 500000
+      }
+    }
+  },
+  "domestic_country_codes": [
+    "KR"
+  ],
+  "tax_type": {
+      "domestic": {
+        "other-income": 8.8,
+        "tax-exampt": 0
+      },
+      "overseas": {
+        "tax-exampt": 0
+      }
+
+  }
+}

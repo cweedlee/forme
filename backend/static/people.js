@@ -26,6 +26,7 @@ function renderTable(data) {
 
   const headerRow = document.createElement("tr");
   headerRow.appendChild(textCell("th", "Row"));
+  headerRow.appendChild(textCell("th", "계약서"));
   for (const column of data.columns) {
     headerRow.appendChild(textCell("th", column));
   }
@@ -38,7 +39,7 @@ function renderTable(data) {
   if (!data.rows.length) {
     const emptyRow = document.createElement("tr");
     const emptyCell = textCell("td", "표시할 행이 없습니다.", "empty");
-    emptyCell.colSpan = data.columns.length + data.decisionColumns.length + 1;
+    emptyCell.colSpan = data.columns.length + data.decisionColumns.length + 2;
     emptyRow.appendChild(emptyCell);
     tbody.appendChild(emptyRow);
     return;
@@ -47,6 +48,16 @@ function renderTable(data) {
   for (const row of data.rows) {
     const tableRow = document.createElement("tr");
     tableRow.appendChild(textCell("td", row.source_row, "row-number"));
+    const actionCell = document.createElement("td");
+    if (row.person) {
+      const button = document.createElement("button");
+      button.className = "generate-button";
+      button.type = "button";
+      button.dataset.sourceRow = row.source_row;
+      button.textContent = "생성";
+      actionCell.appendChild(button);
+    }
+    tableRow.appendChild(actionCell);
     for (const value of row.values) {
       tableRow.appendChild(textCell("td", value));
     }
@@ -54,6 +65,37 @@ function renderTable(data) {
       tableRow.appendChild(textCell("td", row.decisions[column], "decision-cell"));
     }
     tbody.appendChild(tableRow);
+  }
+}
+
+function csrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+async function generateContract(sourceRow, button) {
+  button.disabled = true;
+  setStatus(`Row ${sourceRow} 계약서 생성 중...`, "loading");
+
+  try {
+    const response = await fetch("/people/generate/", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken(),
+      },
+      body: JSON.stringify({ sourceRow }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error((data.errors || []).join(" / ") || `HTTP ${response.status}`);
+    }
+    setStatus(`저장됨: ${data.outputPath}`, "ok");
+  } catch (error) {
+    setStatus(`생성 실패: ${error.message}`, "error");
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -83,3 +125,10 @@ async function refreshPeople() {
 }
 
 refreshButton.addEventListener("click", refreshPeople);
+peopleTable.addEventListener("click", (event) => {
+  const button = event.target.closest(".generate-button");
+  if (!button) {
+    return;
+  }
+  generateContract(button.dataset.sourceRow, button);
+});

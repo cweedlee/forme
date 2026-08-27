@@ -5,12 +5,21 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_ROOT = Path(os.getenv("DATA_ROOT", BASE_DIR.parent / "data")).resolve()
 SYNCED_DATA_ROOT = Path(os.getenv("SYNCED_DATA_ROOT", DATA_ROOT / "synced_data")).resolve()
+TEMPLATE_ROOT = Path(os.getenv("TEMPLATE_ROOT", DATA_ROOT / "templates")).resolve()
+OUTPUT_ROOT = Path(os.getenv("OUTPUT_ROOT", DATA_ROOT / "output")).resolve()
 UNFOLDX_USER_DATA_WORKBOOK = Path(
     os.getenv(
         "UNFOLDX_USER_DATA_WORKBOOK",
         SYNCED_DATA_ROOT / "onedrive" / "unfoldx_user_data.xlsx",
     )
 )
+BUSINESS_RULE_CONFIG_PATH = Path(
+    os.getenv(
+        "BUSINESS_RULE_CONFIG_PATH",
+        BASE_DIR / "project_config" / "business_rules.json",
+    )
+)
+UNFOLDX_USER_DATA_SHEET = os.getenv("UNFOLDX_USER_DATA_SHEET", "Nominator")
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
@@ -86,4 +95,4 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
-(DATA_ROOT / "output").mkdir(parents=True, exist_ok=True)
+OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
