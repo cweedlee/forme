@@ -7,23 +7,6 @@ DATA_ROOT = Path(os.getenv("DATA_ROOT", BASE_DIR.parent / "data")).resolve()
 SYNCED_DATA_ROOT = Path(os.getenv("SYNCED_DATA_ROOT", DATA_ROOT / "synced_data")).resolve()
 TEMPLATE_ROOT = Path(os.getenv("TEMPLATE_ROOT", DATA_ROOT / "templates")).resolve()
 OUTPUT_ROOT = Path(os.getenv("OUTPUT_ROOT", DATA_ROOT / "output")).resolve()
-UNFOLDX_USER_DATA_WORKBOOK = Path(
-    os.getenv(
-        "UNFOLDX_USER_DATA_WORKBOOK",
-        SYNCED_DATA_ROOT / "onedrive" / "unfoldx_user_data.xlsx",
-    )
-)
-BUSINESS_RULE_CONFIG_PATH = Path(
-    os.getenv(
-        "BUSINESS_RULE_CONFIG_PATH",
-        BASE_DIR / "project_config" / "business_rules.json",
-    )
-)
-BUSINESS_RULE_WORKBOOK = Path(
-    os.getenv("BUSINESS_RULE_WORKBOOK", UNFOLDX_USER_DATA_WORKBOOK)
-)
-BUSINESS_RULE_SHEET = os.getenv("BUSINESS_RULE_SHEET", "Rules")
-UNFOLDX_USER_DATA_SHEET = os.getenv("UNFOLDX_USER_DATA_SHEET", "Nominator")
 CURRENT_PROJECT_SLUG = os.getenv("CURRENT_PROJECT_SLUG", "unfoldx_2026")
 PROJECTS_CONFIG_PATH = Path(
     os.getenv(

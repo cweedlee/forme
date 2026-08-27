@@ -3,7 +3,13 @@ from django.test import SimpleTestCase
 from config.services.business_rule_config import NominatorRuleConfig, parse_business_rule_config
 from config.services.person_rows import PersonName, PersonSourceRow, parse_person_source_row
 from config.services.contract_generation import build_output_path, optional_clause_value, person_name_for_language
-from config.services.nominator_contract import PaymentClauseError, _payment_clauses
+from config.services.nominator_contract import (
+    PaymentClauseError,
+    _payment_clauses,
+    build_template_condition_flags,
+    require_value,
+    validate_nominator_person,
+)
 from project_config.nominator_rules import decide_nominator_fee
 
 
@@ -45,15 +51,6 @@ class NominatorFeeRuleTests(SimpleTestCase):
 
         self.assertEqual(decision.status, "MANUAL_REVIEW")
         self.assertIsNone(decision.amount_krw)
-
-    def test_other_engagement_type_is_not_applicable(self):
-        decision = decide_nominator_fee(
-            _person(engagement_type="exhibition", country_code="KR"),
-            _config(domestic_fee=500000, overseas_fee=800000),
-        )
-
-        self.assertEqual(decision.status, "NOT_APPLICABLE")
-
 
 class BusinessRuleConfigTests(SimpleTestCase):
     def test_parse_business_rule_config_keeps_user_constants_explicit(self):
@@ -104,7 +101,7 @@ class PersonSourceRowTests(SimpleTestCase):
             source_row=3,
             headers=["key", "name_kor", "name_eng", "country_code"],
             values=["N_01", "홍길동", "Hong Gil Dong", "KR"],
-            default_engagement_type="nominator",
+            engagement_type="nominator",
         )
 
         self.assertEqual(person.engagement_type, "nominator")
@@ -172,6 +169,37 @@ class ContractLanguageTests(SimpleTestCase):
             optional_clause_value({"payment_clause_2": "추가 지급 조항"}, "payment_clause_2"),
             "추가 지급 조항",
         )
+
+    def test_required_context_value_does_not_fallback_to_empty_value(self):
+        with self.assertRaisesRegex(ValueError, "필수값이 비어 있습니다: gross_amount"):
+            require_value(None, "gross_amount")
+
+    def test_english_generation_requires_english_name(self):
+        person = PersonSourceRow(
+            source_row=2,
+            raw_values=[],
+            raw_by_header={},
+            engagement_type="nominator",
+            name=PersonName(kor="테스트", eng=None),
+            country_code="KR",
+            residence_country="KR",
+            key="N_TEST",
+        )
+
+        with self.assertRaisesRegex(ValueError, "person-name-eng"):
+            validate_nominator_person(person, "eng")
+
+    def test_template_condition_flags_are_available_for_docx_if_blocks(self):
+        domestic = build_template_condition_flags(category="domestic", tax_type="other_income")
+        overseas = build_template_condition_flags(category="overseas", tax_type="tax_exempt")
+
+        self.assertTrue(domestic["is_domestic"])
+        self.assertFalse(domestic["is_overseas"])
+        self.assertTrue(domestic["needs_withholding"])
+        self.assertFalse(domestic["needs_wire_transfer_clause"])
+        self.assertTrue(overseas["is_overseas"])
+        self.assertTrue(overseas["is_tax_exempt"])
+        self.assertTrue(overseas["needs_wire_transfer_clause"])
 
 
 def _person(*, engagement_type: str, country_code: str) -> PersonSourceRow:

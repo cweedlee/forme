@@ -5,7 +5,6 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
 
 from config.services.amount_decisions import decide_amounts_for_person
 from config.services.business_rule_config import BusinessRuleConfig, load_business_rule_config
@@ -17,19 +16,16 @@ from config.services.person_rows import (
 from config.services.project_settings import load_project_config
 
 
-FIRST_ROW = 1
 FIRST_COLUMN = 1
 CODE_HEADER_ROW = 2
 DATA_FIRST_ROW = 3
-SHEET_DEFAULT_ENGAGEMENT_TYPES = {
-    "Nominator": "nominator",
-}
+ENGAGEMENT_TYPE = "nominator"
 DECISION_COLUMNS = ["노미네이터 금액상태", "노미네이터 금액", "노미네이터 근거"]
 SEOUL_TZ = ZoneInfo("Asia/Seoul")
 
 
 @dataclass(frozen=True)
-class WorkbookPeopleTable:
+class NominatorWorkbookTable:
     workbook_path: Path
     sheet_name: str
     columns: list[str]
@@ -38,11 +34,11 @@ class WorkbookPeopleTable:
     metadata: dict[str, Any]
 
 
-def load_people_table(
+def load_nominator_table(
     workbook_path: Path,
     rule_config: BusinessRuleConfig | None = None,
     sheet_name: str | None = None,
-) -> WorkbookPeopleTable:
+) -> NominatorWorkbookTable:
     config = rule_config or load_business_rule_config()
     project_config = load_project_config()
     selected_sheet_name = sheet_name or project_config.people_sheet_for("nominator")
@@ -53,7 +49,7 @@ def load_people_table(
     visible_indexes = visible_column_indexes(headers, layout.get("visible_columns", []))
     columns = display_columns(headers, nature_headers, visible_indexes)
     source_rows = read_non_empty_rows(sheet, first_row=layout["data_first_row"])
-    rows = build_people_table_rows(
+    rows = build_nominator_table_rows(
         source_rows,
         headers,
         visible_indexes,
@@ -62,7 +58,7 @@ def load_people_table(
         layout["data_first_row"],
     )
 
-    return WorkbookPeopleTable(
+    return NominatorWorkbookTable(
         workbook_path=workbook_path,
         sheet_name=selected_sheet_name,
         columns=columns,
@@ -72,7 +68,7 @@ def load_people_table(
     )
 
 
-def load_person_from_workbook(
+def load_nominator_person_from_workbook(
     workbook_path: Path,
     source_row: int,
     sheet_name: str | None = None,
@@ -89,7 +85,7 @@ def load_person_from_workbook(
                 source_row=row_number,
                 headers=headers,
                 values=values,
-                default_engagement_type=SHEET_DEFAULT_ENGAGEMENT_TYPES.get(selected_sheet_name),
+                engagement_type=ENGAGEMENT_TYPE,
             )
     return None
 
@@ -103,13 +99,6 @@ def load_people_sheet(workbook_path: Path, sheet_name: str):
         raise ValueError(f"Sheet not found: {sheet_name}")
 
     return workbook[sheet_name]
-
-
-def read_table_columns(sheet) -> list[str]:
-    return [
-        get_column_letter(column)
-        for column in range(FIRST_COLUMN, sheet.max_column + 1)
-    ]
 
 
 def read_code_headers(sheet, *, row_number: int = CODE_HEADER_ROW) -> list[str]:
@@ -146,7 +135,7 @@ def build_table_metadata(workbook_path: Path, config: BusinessRuleConfig) -> dic
     }
 
 
-def build_people_table_rows(
+def build_nominator_table_rows(
     source_rows: list[tuple[int, list[Any]]],
     headers: list[str],
     visible_indexes: list[int],
@@ -170,7 +159,7 @@ def build_people_table_rows(
             source_row=row_number,
             headers=headers,
             values=values,
-            default_engagement_type=SHEET_DEFAULT_ENGAGEMENT_TYPES.get(sheet_name),
+            engagement_type=ENGAGEMENT_TYPE,
         )
         if not _has_person_identity(person):
             rows.append(_build_preview_row(row_number, visible_values))

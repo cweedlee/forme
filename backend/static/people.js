@@ -8,8 +8,8 @@ const nominatorRules = document.getElementById("nominatorRules");
 const peopleTable = document.getElementById("peopleTable");
 const healthCheckButton = document.getElementById("healthCheckButton");
 const contractPage = document.getElementById("contractPage");
-const dataUrl = contractPage?.dataset.dataUrl ?? "/people/data/";
-const generateUrl = contractPage?.dataset.generateUrl ?? "/people/generate/";
+const dataUrl = contractPage?.dataset.dataUrl ?? "/nominator/data/";
+const generateUrl = contractPage?.dataset.generateUrl ?? "/nominator/generate/";
 const healthUrl = contractPage?.dataset.healthUrl ?? "/health/";
 
 function setStatus(message, mode = "idle") {

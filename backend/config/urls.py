@@ -10,7 +10,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.cache import never_cache
 
 from config.services.contract_generation import generate_contract_for_person
-from config.services.people_source import load_people_table, load_person_from_workbook
+from config.services.nominator_source import load_nominator_person_from_workbook, load_nominator_table
 from config.services.project_settings import load_project_config
 
 
@@ -27,7 +27,7 @@ def index(request: HttpRequest):
 @never_cache
 def nominator(request: HttpRequest):
     project_config = load_project_config()
-    table = load_people_table(
+    table = load_nominator_table(
         project_config.workbook_path,
         sheet_name=project_config.people_sheet_for("nominator"),
     )
@@ -46,7 +46,7 @@ def nominator(request: HttpRequest):
 @never_cache
 def nominator_data(_: HttpRequest) -> JsonResponse:
     project_config = load_project_config()
-    table = load_people_table(
+    table = load_nominator_table(
         project_config.workbook_path,
         sheet_name=project_config.people_sheet_for("nominator"),
     )
@@ -78,7 +78,7 @@ def generate_nominator_contract(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "errors": ["sourceRow 값이 필요합니다."]}, status=400)
 
     project_config = load_project_config()
-    person = load_person_from_workbook(
+    person = load_nominator_person_from_workbook(
         project_config.workbook_path,
         source_row,
         sheet_name=project_config.people_sheet_for("nominator"),

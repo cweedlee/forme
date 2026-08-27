@@ -3,11 +3,10 @@ from typing import Any
 
 
 HEADER_ALIASES = {
-    "engagement_type": {"타입", "참여유형", "계약유형"},
     "key": {"key", "person_key", "kor_key", "KOR_KEY"},
-    "name_kor": {"name_kor", "person_name_kor", "국문 이름", "이름", "성명"},
-    "name_eng": {"name_eng", "person_name_eng", "english_name", "영문 이름", "영문이름", "영문명"},
-    "country_code": {"country_code", "국가코드"},
+    "name_kor": {"name_kor", "person_name_kor", "국문 이름", "국문 성명", "이름", "성명"},
+    "name_eng": {"name_eng", "person_name_eng", "english_name", "영문 이름", "영문 성명", "영문이름", "영문명"},
+    "country_code": {"country_code", "국가코드", "세법상 거주국"},
     "residence_country": {"residence_country", "거주지", "거주국", "세법상 거주국", "country_code", "국가코드"},
 }
 
@@ -45,16 +44,14 @@ def parse_person_source_row(
     source_row: int,
     headers: list[str],
     values: list[Any],
-    default_engagement_type: str | None = None,
+    engagement_type: str,
 ) -> PersonSourceRow:
     raw_by_header = _row_by_header(headers, values)
     return PersonSourceRow(
         source_row=source_row,
         raw_values=values,
         raw_by_header=raw_by_header,
-        engagement_type=str(
-            _find_value(raw_by_header, "engagement_type") or default_engagement_type or ""
-        ).strip(),
+        engagement_type=engagement_type,
         key=str(_find_value(raw_by_header, "key") or "").strip(),
         name=PersonName(
             kor=str(_find_value(raw_by_header, "name_kor") or "").strip(),

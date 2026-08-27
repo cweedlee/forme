@@ -1,9 +1,7 @@
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from django.conf import settings
 from openpyxl import load_workbook
 
 from config.services.project_settings import load_project_config
@@ -26,21 +24,10 @@ class BusinessRuleConfig:
 
 def load_business_rule_config() -> BusinessRuleConfig:
     project_config = load_project_config()
-    try:
-        return load_business_rule_config_from_workbook(
-            project_config.workbook_path,
-            project_config.rules_sheet,
-        )
-    except (FileNotFoundError, ValueError):
-        return load_business_rule_config_from_json(settings.BUSINESS_RULE_CONFIG_PATH)
-
-
-def load_business_rule_config_from_json(config_path: Path) -> BusinessRuleConfig:
-    path = config_path or settings.BUSINESS_RULE_CONFIG_PATH
-    with path.open(encoding="utf-8") as config_file:
-        raw_config = json.load(config_file)
-    raw_config["_source"] = f"json:{path}"
-    return parse_business_rule_config(raw_config)
+    return load_business_rule_config_from_workbook(
+        project_config.workbook_path,
+        project_config.rules_sheet,
+    )
 
 
 def load_business_rule_config_from_workbook(workbook_path: Path, sheet_name: str) -> BusinessRuleConfig:
@@ -149,7 +136,7 @@ def parse_business_rule_config(raw_config: dict[str, Any]) -> BusinessRuleConfig
             },
             tax_rates={
                 _normalize_region(region): {
-                    _normalize_tax_type(tax_type): float(rate or 0)
+                    _normalize_tax_type(tax_type): _required_float(rate, f"tax_type.{region}.{tax_type}")
                     for tax_type, rate in rules.items()
                 }
                 for region, rules in raw_config.get("tax_type", {}).items()
@@ -163,6 +150,12 @@ def _optional_int(value: Any) -> int | None:
     if value is None or value == "":
         return None
     return int(value)
+
+
+def _required_float(value: Any, field_name: str) -> float:
+    if value in (None, ""):
+        raise ValueError(f"Rules 필수값이 비어 있습니다: {field_name}")
+    return float(value)
 
 
 def _extract_payment_clauses(values: dict[str, Any]) -> dict[str, dict[str, str]]:

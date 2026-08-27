@@ -3,11 +3,6 @@ from dataclasses import dataclass
 from config.services.business_rule_config import NominatorRuleConfig
 from config.services.person_rows import PersonSourceRow
 
-
-NOMINATOR_ENGAGEMENT_TYPE = "nominator"
-NOMINATOR_ENGAGEMENT_ALIASES = {"nominator", "노미네이터"}
-
-
 @dataclass(frozen=True)
 class NominatorFeeDecision:
     status: str
@@ -21,14 +16,6 @@ class NominatorFeeDecision:
 
 
 def decide_nominator_fee(person: PersonSourceRow, config: NominatorRuleConfig) -> NominatorFeeDecision:
-    if _normalize(person.engagement_type) not in NOMINATOR_ENGAGEMENT_ALIASES:
-        return NominatorFeeDecision(
-            status="NOT_APPLICABLE",
-            amount_krw=None,
-            category=None,
-            reason="참여유형이 노미네이터가 아닙니다.",
-        )
-
     country = _normalize(person.residence_country or person.country_code)
     if not country:
         return _manual_review("거주국 값이 비어 있어 국내/국외를 판단할 수 없습니다.")
