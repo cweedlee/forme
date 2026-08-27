@@ -4,6 +4,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_ROOT = Path(os.getenv("DATA_ROOT", BASE_DIR.parent / "data")).resolve()
+SYNCED_DATA_ROOT = Path(os.getenv("SYNCED_DATA_ROOT", DATA_ROOT / "synced_data")).resolve()
+UNFOLDX_USER_DATA_WORKBOOK = Path(
+    os.getenv(
+        "UNFOLDX_USER_DATA_WORKBOOK",
+        SYNCED_DATA_ROOT / "onedrive" / "unfoldx_user_data.xlsx",
+    )
+)
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
@@ -14,6 +21,7 @@ ALLOWED_HOSTS = [
 ]
 
 INSTALLED_APPS = [
+    "config",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -69,6 +77,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR.parent / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", "15552000"))
