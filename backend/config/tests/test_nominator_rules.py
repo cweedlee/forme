@@ -6,6 +6,7 @@ from config.services.contract_generation import (
     PaymentClauseError,
     _payment_clauses,
     build_output_path,
+    optional_clause_value,
     person_name_for_language,
 )
 from project_config.nominator_rules import decide_nominator_fee
@@ -165,6 +166,16 @@ class ContractLanguageTests(SimpleTestCase):
         self.assertEqual(
             clauses["payment_clause_1"],
             "계약금액 500,000원에서 8.8%를 공제한다.",
+        )
+
+    def test_missing_optional_clause_is_marked_for_paragraph_removal(self):
+        self.assertEqual(
+            optional_clause_value({}, "payment_clause_2"),
+            "__UNFOLDX_REMOVE_PARAGRAPH__",
+        )
+        self.assertEqual(
+            optional_clause_value({"payment_clause_2": "추가 지급 조항"}, "payment_clause_2"),
+            "추가 지급 조항",
         )
 
 

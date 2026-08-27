@@ -162,7 +162,7 @@ def _optional_int(value: Any) -> int | None:
     return int(value)
 
 
-def _extract_payment_clauses(values: dict[str, Any]) -> dict[str, str]:
+def _extract_payment_clauses(values: dict[str, Any]) -> dict[str, dict[str, str]]:
     clauses: dict[str, dict[str, str]] = {"kor": {}, "eng": {}}
     for key, value in values.items():
         if not key.startswith("payment_clause") or value in (None, ""):

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from django.conf import settings
+from docx import Document
 from docxtpl import DocxTemplate
 from jinja2 import TemplateSyntaxError
 
@@ -14,6 +15,10 @@ from project_config.nominator_rules import decide_nominator_fee
 
 class PaymentClauseError(ValueError):
     pass
+
+
+REMOVE_PARAGRAPH_SENTINEL = "__UNFOLDX_REMOVE_PARAGRAPH__"
+OPTIONAL_CLAUSE_KEYS = {"payment_clause_2"}
 
 
 CONTRACT_TEMPLATE_REGISTRY = {
@@ -76,6 +81,7 @@ def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") 
         doc = DocxTemplate(template_path)
         doc.render(context)
         doc.save(temp_path)
+        remove_sentinel_paragraphs(temp_path)
         DocxTemplate(temp_path)
         temp_path.replace(output_path)
     except Exception as exc:
@@ -113,7 +119,7 @@ def build_nominator_context(person: PersonSourceRow, language: str = "kor") -> d
         "final_amount": _format_number(final_amount),
         "payment_clause": "\n".join(payment_clauses.values()),
         "payment_clause_1": payment_clauses.get("payment_clause_1", ""),
-        "payment_clause_2": payment_clauses.get("payment_clause_2", ""),
+        "payment_clause_2": optional_clause_value(payment_clauses, "payment_clause_2"),
     }
 
 
@@ -133,11 +139,11 @@ def validate_template_context(template_path: Path, context: dict[str, Any]) -> l
 
 
 def build_output_path(*, person: PersonSourceRow, engagement_type: str, language: str) -> Path:
-    timecode = datetime.now(timezone.utc).strftime("%y%m%d-%H%M%f")
+    timecode = datetime.now(timezone.utc).strftime("%y%m%d-%H:%M")
     safe_folder_name = sanitize_path_component(person.name.kor or "unknown")
     safe_file_name = sanitize_path_component(person_name_for_language(person, language))
     safe_key = sanitize_path_component(person.key or f"row{person.source_row}")
-    directory = settings.OUTPUT_ROOT / engagement_type / f"{safe_key}_{safe_folder_name}"
+    directory = settings.OUTPUT_ROOT / engagement_type / f"[{safe_key}]{safe_folder_name}"
     filename = f"{safe_file_name}_{timecode}.docx"
     return directory / filename
 
@@ -153,6 +159,31 @@ def sanitize_path_component(value: str) -> str:
     cleaned = "".join("_" if char in blocked or ord(char) < 32 else char for char in value)
     cleaned = cleaned.strip().strip(".")
     return cleaned or "unknown"
+
+
+def optional_clause_value(payment_clauses: dict[str, str], key: str) -> str:
+    value = payment_clauses.get(key, "")
+    if value or key not in OPTIONAL_CLAUSE_KEYS:
+        return value
+    return REMOVE_PARAGRAPH_SENTINEL
+
+
+def remove_sentinel_paragraphs(docx_path: Path) -> None:
+    document = Document(docx_path)
+    for paragraph in list(iter_document_paragraphs(document)):
+        if REMOVE_PARAGRAPH_SENTINEL in paragraph.text:
+            paragraph._element.getparent().remove(paragraph._element)
+    document.save(docx_path)
+
+
+def iter_document_paragraphs(container):
+    for paragraph in getattr(container, "paragraphs", []):
+        yield paragraph
+    for table in getattr(container, "tables", []):
+        for row in table.rows:
+            for cell in row.cells:
+                yield from iter_document_paragraphs(cell)
+
 
 # 000,000,000 단위로 숫자 포맷팅
 def _format_number(value: int) -> str:
