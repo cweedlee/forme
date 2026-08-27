@@ -24,6 +24,13 @@ BUSINESS_RULE_WORKBOOK = Path(
 )
 BUSINESS_RULE_SHEET = os.getenv("BUSINESS_RULE_SHEET", "Rules")
 UNFOLDX_USER_DATA_SHEET = os.getenv("UNFOLDX_USER_DATA_SHEET", "Nominator")
+CURRENT_PROJECT_SLUG = os.getenv("CURRENT_PROJECT_SLUG", "unfoldx_2026")
+PROJECTS_CONFIG_PATH = Path(
+    os.getenv(
+        "PROJECTS_CONFIG_PATH",
+        BASE_DIR / "project_config" / "projects.json",
+    )
+)
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"

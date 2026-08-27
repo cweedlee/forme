@@ -6,6 +6,8 @@ from typing import Any
 from django.conf import settings
 from openpyxl import load_workbook
 
+from config.services.project_settings import load_project_config
+
 
 @dataclass(frozen=True)
 class NominatorRuleConfig:
@@ -23,10 +25,11 @@ class BusinessRuleConfig:
 
 
 def load_business_rule_config() -> BusinessRuleConfig:
+    project_config = load_project_config()
     try:
         return load_business_rule_config_from_workbook(
-            settings.BUSINESS_RULE_WORKBOOK,
-            settings.BUSINESS_RULE_SHEET,
+            project_config.workbook_path,
+            project_config.rules_sheet,
         )
     except (FileNotFoundError, ValueError):
         return load_business_rule_config_from_json(settings.BUSINESS_RULE_CONFIG_PATH)

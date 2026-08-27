@@ -5,22 +5,29 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>UnfoldX People</title>
+    <title>UnfoldX Nominator</title>
     <link rel="stylesheet" href="{% static 'people.css' %}">
   </head>
   <body>
-    <main class="page">
+    <main
+      class="page"
+      id="contractPage"
+      data-data-url="{{ data_url }}"
+      data-generate-url="{{ generate_url }}"
+      data-health-url="/health/"
+    >
       <header class="toolbar">
         <div>
-          <h1>UnfoldX People</h1>
+          <h1>UnfoldX Nominator</h1>
           <p id="tableMeta">{{ table.sheet_name }} · {{ row_count }} rows</p>
         </div>
         <div class="actions">
+          <a class="link-button" href="/">Index</a>
           <button class="refresh-button" id="refreshButton" type="button">
             <span aria-hidden="true">↻</span>
             <span>현재 파일 불러오기</span>
           </button>
-          <a class="link-button" href="/health/">Health</a>
+          <button class="link-button" id="healthCheckButton" type="button">HealthCheck</button>
         </div>
       </header>
 
@@ -38,7 +45,7 @@
         <code id="nominatorRules">{{ table.metadata.nominator_gross_amount }}</code>
       </section>
 
-      <section class="table-wrap" aria-label="People source table">
+      <section class="table-wrap" aria-label="Nominator source table">
         <table id="peopleTable">
           <thead>
             <tr>

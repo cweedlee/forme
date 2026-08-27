@@ -56,6 +56,37 @@ p {
   align-items: center;
 }
 
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.type-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 96px;
+  padding: 16px;
+  border: 1px solid #d9dee3;
+  border-radius: 6px;
+  color: #26313a;
+  text-decoration: none;
+  background: #ffffff;
+}
+
+.type-card strong {
+  font-size: 17px;
+}
+
+.type-card span {
+  color: #5d6872;
+}
+
+.type-card-disabled {
+  opacity: 0.55;
+}
+
 .refresh-button {
   display: inline-flex;
   align-items: center;

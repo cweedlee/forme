@@ -6,8 +6,16 @@ const workbookMtime = document.getElementById("workbookMtime");
 const rulesSource = document.getElementById("rulesSource");
 const nominatorRules = document.getElementById("nominatorRules");
 const peopleTable = document.getElementById("peopleTable");
+const healthCheckButton = document.getElementById("healthCheckButton");
+const contractPage = document.getElementById("contractPage");
+const dataUrl = contractPage?.dataset.dataUrl ?? "/people/data/";
+const generateUrl = contractPage?.dataset.generateUrl ?? "/people/generate/";
+const healthUrl = contractPage?.dataset.healthUrl ?? "/health/";
 
 function setStatus(message, mode = "idle") {
+  if (!refreshStatus) {
+    return;
+  }
   refreshStatus.textContent = message;
   refreshStatus.dataset.mode = mode;
 }
@@ -22,6 +30,9 @@ function textCell(tagName, value, className = "") {
 }
 
 function renderTable(data) {
+  if (!peopleTable) {
+    return;
+  }
   const thead = peopleTable.querySelector("thead");
   const tbody = peopleTable.querySelector("tbody");
   thead.textContent = "";
@@ -79,10 +90,18 @@ function generateButton(sourceRow, language, label) {
 }
 
 function renderMetadata(data) {
-  workbookPath.textContent = data.workbookPath;
-  workbookMtime.textContent = data.metadata?.workbook_mtime ?? "";
-  rulesSource.textContent = data.metadata?.rules_source ?? "";
-  nominatorRules.textContent = JSON.stringify(data.metadata?.nominator_gross_amount ?? {});
+  if (workbookPath) {
+    workbookPath.textContent = data.workbookPath;
+  }
+  if (workbookMtime) {
+    workbookMtime.textContent = data.metadata?.workbook_mtime ?? "";
+  }
+  if (rulesSource) {
+    rulesSource.textContent = data.metadata?.rules_source ?? "";
+  }
+  if (nominatorRules) {
+    nominatorRules.textContent = JSON.stringify(data.metadata?.nominator_gross_amount ?? {});
+  }
 }
 
 function csrfToken() {
@@ -99,7 +118,7 @@ async function generateContract(sourceRow, language, button) {
   setStatus(`Row ${sourceRow} ${language} 계약서 생성 중...`, "loading");
 
   try {
-    const response = await fetch("/people/generate/", {
+    const response = await fetch(generateUrl, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -121,11 +140,14 @@ async function generateContract(sourceRow, language, button) {
 }
 
 async function refreshPeople() {
+  if (!refreshButton) {
+    return;
+  }
   refreshButton.disabled = true;
   setStatus("불러오는 중...", "loading");
 
   try {
-    const response = await fetch("/people/data/", {
+    const response = await fetch(dataUrl, {
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
@@ -135,9 +157,14 @@ async function refreshPeople() {
 
     const data = await response.json();
     renderTable(data);
-    tableMeta.textContent = `${data.sheetName} · ${data.rowCount} rows`;
+    if (tableMeta) {
+      tableMeta.textContent = `${data.sheetName} · ${data.rowCount} rows`;
+    }
     renderMetadata(data);
-    setStatus(`갱신됨 ${new Date().toLocaleTimeString("ko-KR")}`, "ok");
+    setStatus(
+      `갱신됨 ${new Date().toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul" })}`,
+      "ok",
+    );
   } catch (error) {
     setStatus(`불러오기 실패: ${error.message}`, "error");
   } finally {
@@ -145,11 +172,45 @@ async function refreshPeople() {
   }
 }
 
-refreshButton.addEventListener("click", refreshPeople);
-peopleTable.addEventListener("click", (event) => {
-  const button = event.target.closest(".generate-button");
-  if (!button) {
+async function checkHealth() {
+  if (!healthCheckButton) {
     return;
   }
-  generateContract(button.dataset.sourceRow, button.dataset.language, button);
-});
+  healthCheckButton.disabled = true;
+  setStatus("Health 확인 중...", "loading");
+
+  try {
+    const response = await fetch(healthUrl, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    setStatus(`Health: ${data.status ?? "unknown"}`, "ok");
+  } catch (error) {
+    setStatus(`Health 실패: ${error.message}`, "error");
+  } finally {
+    healthCheckButton.disabled = false;
+  }
+}
+
+if (refreshButton) {
+  refreshButton.addEventListener("click", refreshPeople);
+}
+
+if (peopleTable) {
+  peopleTable.addEventListener("click", (event) => {
+    const button = event.target.closest(".generate-button");
+    if (!button) {
+      return;
+    }
+    generateContract(button.dataset.sourceRow, button.dataset.language, button);
+  });
+}
+
+if (healthCheckButton) {
+  healthCheckButton.addEventListener("click", checkHealth);
+}

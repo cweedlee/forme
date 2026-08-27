@@ -1,35 +1,20 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from docx import Document
 from docxtpl import DocxTemplate
 from jinja2 import TemplateSyntaxError
 
-from config.services.business_rule_config import load_business_rule_config
 from config.services.person_rows import PersonSourceRow
-from project_config.nominator_rules import decide_nominator_fee
-
-
-class PaymentClauseError(ValueError):
-    pass
+from config.services.project_settings import ALLOWED_LANGUAGES, load_project_config
 
 
 REMOVE_PARAGRAPH_SENTINEL = "__UNFOLDX_REMOVE_PARAGRAPH__"
 OPTIONAL_CLAUSE_KEYS = {"payment_clause_2"}
-
-
-CONTRACT_TEMPLATE_REGISTRY = {
-    "nominator": {
-        "templates": {
-            "kor": "norminator-kor.docx",
-            "eng": "norminator-eng.docx",
-        },
-        "version": 1,
-    }
-}
+SEOUL_TZ = ZoneInfo("Asia/Seoul")
 
 
 @dataclass(frozen=True)
@@ -40,20 +25,21 @@ class ContractGenerationResult:
 
 
 def generate_contract_for_person(person: PersonSourceRow, language: str = "kor") -> ContractGenerationResult:
-    if person.engagement_type != "nominator":
+    engagement_type = person.engagement_type
+    if engagement_type != "nominator":
         return ContractGenerationResult(
             ok=False,
-            errors=[f"지원하지 않는 계약서 타입: {person.engagement_type}"],
+            errors=[f"지원하지 않는 계약서 타입: {engagement_type}"],
         )
-    return generate_nominator_contract(person, language)
-
-
-def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") -> ContractGenerationResult:
-    if language not in {"kor", "eng"}:
+    if language not in ALLOWED_LANGUAGES:
         return ContractGenerationResult(ok=False, errors=[f"지원하지 않는 언어: {language}"])
 
-    registry = CONTRACT_TEMPLATE_REGISTRY["nominator"]
-    template_path = settings.TEMPLATE_ROOT / registry["templates"][language]
+    project_config = load_project_config()
+    try:
+        template_path = project_config.template_for(engagement_type, language).path
+    except ValueError as exc:
+        return ContractGenerationResult(ok=False, errors=[str(exc)])
+
     if not template_path.exists():
         return ContractGenerationResult(
             ok=False,
@@ -61,8 +47,8 @@ def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") 
         )
 
     try:
-        context = build_nominator_context(person, language)
-    except PaymentClauseError as exc:
+        context = build_contract_context(person, language)
+    except ValueError as exc:
         return ContractGenerationResult(ok=False, errors=[str(exc)])
 
     validation_errors = validate_template_context(template_path, context)
@@ -71,7 +57,7 @@ def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") 
 
     output_path = build_output_path(
         person=person,
-        engagement_type="nominator",
+        engagement_type=engagement_type,
         language=language,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -92,35 +78,16 @@ def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") 
     return ContractGenerationResult(ok=True, output_path=str(output_path))
 
 
-def build_nominator_context(person: PersonSourceRow, language: str = "kor") -> dict[str, Any]:
-    config = load_business_rule_config()
-    fee_decision = decide_nominator_fee(person, config.nominator)
-    gross_amount = fee_decision.amount_krw or 0
-    tax_type = config.nominator.tax_type.get(fee_decision.category or "", "tax_exempt")
-    tax_rate = config.nominator.tax_rates.get(fee_decision.category or "", {}).get(tax_type or "", 0)
-    tax_amount = round(gross_amount * tax_rate / 100)
-    final_amount = gross_amount - tax_amount
-    payment_clauses = _payment_clauses(
-        config.nominator.payment_clauses,
-        fee_decision.category,
-        language,
-        gross_amount,
-        tax_rate,
-    )
-    return {
-        "participant_name": person_name_for_language(person, language),
-        "participant_name_kor": person.name.kor,
-        "participant_name_eng": person.name.eng or "",
-        "person_key": person.key,
-        "country_code": person.country_code,
-        "gross_amount": _format_number(gross_amount),
-        "tax_rate": tax_rate,
-        "tax_amount": _format_number(tax_amount),
-        "final_amount": _format_number(final_amount),
-        "payment_clause": "\n".join(payment_clauses.values()),
-        "payment_clause_1": payment_clauses.get("payment_clause_1", ""),
-        "payment_clause_2": optional_clause_value(payment_clauses, "payment_clause_2"),
-    }
+def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") -> ContractGenerationResult:
+    return generate_contract_for_person(person, language)
+
+
+def build_contract_context(person: PersonSourceRow, language: str) -> dict[str, object]:
+    if person.engagement_type == "nominator":
+        from config.services.nominator_contract import build_nominator_context
+
+        return build_nominator_context(person, language)
+    raise ValueError(f"지원하지 않는 계약서 타입: {person.engagement_type}")
 
 
 def validate_template_context(template_path: Path, context: dict[str, Any]) -> list[str]:
@@ -139,11 +106,12 @@ def validate_template_context(template_path: Path, context: dict[str, Any]) -> l
 
 
 def build_output_path(*, person: PersonSourceRow, engagement_type: str, language: str) -> Path:
-    timecode = datetime.now(timezone.utc).strftime("%y%m%d-%H:%M")
+    project_config = load_project_config()
+    timecode = datetime.now(SEOUL_TZ).strftime("%y%m%d-%H%M%S%f")
     safe_folder_name = sanitize_path_component(person.name.kor or "unknown")
     safe_file_name = sanitize_path_component(person_name_for_language(person, language))
     safe_key = sanitize_path_component(person.key or f"row{person.source_row}")
-    directory = settings.OUTPUT_ROOT / engagement_type / f"[{safe_key}]{safe_folder_name}"
+    directory = project_config.output_root / engagement_type / f"[{safe_key}]{safe_folder_name}"
     filename = f"{safe_file_name}_{timecode}.docx"
     return directory / filename
 
@@ -183,27 +151,3 @@ def iter_document_paragraphs(container):
         for row in table.rows:
             for cell in row.cells:
                 yield from iter_document_paragraphs(cell)
-
-
-# 000,000,000 단위로 숫자 포맷팅
-def _format_number(value: int) -> str:
-    return f"{value:,}"
-
-
-def _payment_clauses(
-    clauses_by_region: dict[str, dict[str, dict[str, str]]],
-    category: str | None,
-    language: str,
-    gross_amount: int,
-    tax_rate: float,
-) -> dict[str, str]:
-    clauses = clauses_by_region.get(category or "", {}).get(language, {})
-    rendered = {
-        key: clause.format(gross_amount=_format_number(gross_amount), tax_rate=tax_rate)
-        for key, clause in sorted(clauses.items())
-    }
-    if rendered:
-        return rendered
-    raise PaymentClauseError(
-        f"지급 clause 설정을 찾을 수 없습니다. 확인이 필요합니다: category={category or '없음'}, language={language}"
-    )

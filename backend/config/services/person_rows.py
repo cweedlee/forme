@@ -11,7 +11,7 @@ HEADER_ALIASES = {
     "residence_country": {"residence_country", "거주지", "거주국", "세법상 거주국", "country_code", "국가코드"},
 }
 
-REQUIRED_CODE_HEADERS = {"person_key", "person_name_kor", "person_name_eng", "country_code"}
+REQUIRED_FIELDS = {"key", "name_kor", "name_eng", "country_code"}
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,10 @@ class PersonSourceRow:
 
 def is_person_code_header_row(values: list[Any]) -> bool:
     labels = {_normalize_header(str(value or "").strip()) for value in values}
-    return REQUIRED_CODE_HEADERS.issubset(labels)
+    return all(
+        labels & {_normalize_header(alias) for alias in HEADER_ALIASES[field_name]}
+        for field_name in REQUIRED_FIELDS
+    )
 
 
 def parse_person_source_row(

@@ -1,0 +1,34 @@
+{% load static %}
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UnfoldX Contracts</title>
+    <link rel="stylesheet" href="{% static 'people.css' %}">
+  </head>
+  <body>
+    <main class="page">
+      <header class="toolbar">
+        <div>
+          <h1>UnfoldX Contracts</h1>
+          <p>계약 유형을 선택하세요.</p>
+        </div>
+        <div class="actions">
+          <a class="link-button" href="/health/">Health</a>
+        </div>
+      </header>
+
+      <section class="type-grid" aria-label="Contract types">
+        <a class="type-card" href="/nominator/">
+          <strong>Nominator</strong>
+          <span>노미네이터 계약서 생성</span>
+        </a>
+        <span class="type-card type-card-disabled">
+          <strong>Artist</strong>
+          <span>준비 중</span>
+        </span>
+      </section>
+    </main>
+  </body>
+</html>

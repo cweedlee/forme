@@ -2,13 +2,8 @@ from django.test import SimpleTestCase
 
 from config.services.business_rule_config import NominatorRuleConfig, parse_business_rule_config
 from config.services.person_rows import PersonName, PersonSourceRow, parse_person_source_row
-from config.services.contract_generation import (
-    PaymentClauseError,
-    _payment_clauses,
-    build_output_path,
-    optional_clause_value,
-    person_name_for_language,
-)
+from config.services.contract_generation import build_output_path, optional_clause_value, person_name_for_language
+from config.services.nominator_contract import PaymentClauseError, _payment_clauses
 from project_config.nominator_rules import decide_nominator_fee
 
 
@@ -135,7 +130,7 @@ class ContractLanguageTests(SimpleTestCase):
             language="eng",
         )
 
-        self.assertIn("N_TEST_테스트", str(output_path.parent))
+        self.assertIn("[N_TEST]테스트", str(output_path.parent))
         self.assertTrue(output_path.name.startswith("Test Person_"))
 
     def test_missing_payment_clause_requires_error_instead_of_fallback(self):
