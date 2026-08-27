@@ -19,6 +19,10 @@ BUSINESS_RULE_CONFIG_PATH = Path(
         BASE_DIR / "project_config" / "business_rules.json",
     )
 )
+BUSINESS_RULE_WORKBOOK = Path(
+    os.getenv("BUSINESS_RULE_WORKBOOK", UNFOLDX_USER_DATA_WORKBOOK)
+)
+BUSINESS_RULE_SHEET = os.getenv("BUSINESS_RULE_SHEET", "Rules")
 UNFOLDX_USER_DATA_SHEET = os.getenv("UNFOLDX_USER_DATA_SHEET", "Nominator")
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]

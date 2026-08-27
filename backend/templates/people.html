@@ -4,6 +4,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>UnfoldX People</title>
     <link rel="stylesheet" href="{% static 'people.css' %}">
   </head>
@@ -28,6 +29,14 @@
         <code id="workbookPath">{{ table.workbook_path }}</code>
         <span class="status" id="refreshStatus" aria-live="polite"></span>
       </section>
+      <section class="source source-detail">
+        <span>Workbook mtime</span>
+        <code id="workbookMtime">{{ table.metadata.workbook_mtime }}</code>
+        <span>Rules</span>
+        <code id="rulesSource">{{ table.metadata.rules_source }}</code>
+        <span>Nominator</span>
+        <code id="nominatorRules">{{ table.metadata.nominator_gross_amount }}</code>
+      </section>
 
       <section class="table-wrap" aria-label="People source table">
         <table id="peopleTable">
@@ -49,7 +58,8 @@
                 <td class="row-number">{{ row|get_item:"source_row" }}</td>
                 <td>
                   {% if row|get_item:"person" %}
-                    <button class="generate-button" type="button" data-source-row="{{ row|get_item:"source_row" }}">생성</button>
+                    <button class="generate-button" type="button" data-source-row="{{ row|get_item:"source_row" }}" data-language="kor">국문</button>
+                    <button class="generate-button" type="button" data-source-row="{{ row|get_item:"source_row" }}" data-language="eng">영문</button>
                   {% endif %}
                 </td>
                 {% for value in row|get_item:"values" %}

@@ -12,10 +12,16 @@ from config.services.person_rows import PersonSourceRow
 from project_config.nominator_rules import decide_nominator_fee
 
 
+class PaymentClauseError(ValueError):
+    pass
+
+
 CONTRACT_TEMPLATE_REGISTRY = {
     "nominator": {
-        "template": "temp-norminator.docx",
-        "language": "kor",
+        "templates": {
+            "kor": "norminator-kor.docx",
+            "eng": "norminator-eng.docx",
+        },
         "version": 1,
     }
 }
@@ -28,25 +34,32 @@ class ContractGenerationResult:
     errors: list[str] | None = None
 
 
-def generate_contract_for_person(person: PersonSourceRow) -> ContractGenerationResult:
+def generate_contract_for_person(person: PersonSourceRow, language: str = "kor") -> ContractGenerationResult:
     if person.engagement_type != "nominator":
         return ContractGenerationResult(
             ok=False,
             errors=[f"지원하지 않는 계약서 타입: {person.engagement_type}"],
         )
-    return generate_nominator_contract(person)
+    return generate_nominator_contract(person, language)
 
 
-def generate_nominator_contract(person: PersonSourceRow) -> ContractGenerationResult:
+def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") -> ContractGenerationResult:
+    if language not in {"kor", "eng"}:
+        return ContractGenerationResult(ok=False, errors=[f"지원하지 않는 언어: {language}"])
+
     registry = CONTRACT_TEMPLATE_REGISTRY["nominator"]
-    template_path = settings.TEMPLATE_ROOT / registry["template"]
+    template_path = settings.TEMPLATE_ROOT / registry["templates"][language]
     if not template_path.exists():
         return ContractGenerationResult(
             ok=False,
             errors=[f"템플릿 파일을 찾을 수 없습니다: {template_path}"],
         )
 
-    context = build_nominator_context(person)
+    try:
+        context = build_nominator_context(person, language)
+    except PaymentClauseError as exc:
+        return ContractGenerationResult(ok=False, errors=[str(exc)])
+
     validation_errors = validate_template_context(template_path, context)
     if validation_errors:
         return ContractGenerationResult(ok=False, errors=validation_errors)
@@ -54,7 +67,7 @@ def generate_nominator_contract(person: PersonSourceRow) -> ContractGenerationRe
     output_path = build_output_path(
         person=person,
         engagement_type="nominator",
-        language=registry["language"],
+        language=language,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -73,21 +86,34 @@ def generate_nominator_contract(person: PersonSourceRow) -> ContractGenerationRe
     return ContractGenerationResult(ok=True, output_path=str(output_path))
 
 
-def build_nominator_context(person: PersonSourceRow) -> dict[str, Any]:
+def build_nominator_context(person: PersonSourceRow, language: str = "kor") -> dict[str, Any]:
     config = load_business_rule_config()
     fee_decision = decide_nominator_fee(person, config.nominator)
     gross_amount = fee_decision.amount_krw or 0
-    tax_rate = 8.8 if fee_decision.category == "domestic" else 0
+    tax_type = config.nominator.tax_type.get(fee_decision.category or "", "tax_exempt")
+    tax_rate = config.nominator.tax_rates.get(fee_decision.category or "", {}).get(tax_type or "", 0)
     tax_amount = round(gross_amount * tax_rate / 100)
     final_amount = gross_amount - tax_amount
+    payment_clauses = _payment_clauses(
+        config.nominator.payment_clauses,
+        fee_decision.category,
+        language,
+        gross_amount,
+        tax_rate,
+    )
     return {
-        "participant_name": person.name,
+        "participant_name": person_name_for_language(person, language),
+        "participant_name_kor": person.name.kor,
+        "participant_name_eng": person.name.eng or "",
+        "person_key": person.key,
         "country_code": person.country_code,
         "gross_amount": _format_number(gross_amount),
         "tax_rate": tax_rate,
         "tax_amount": _format_number(tax_amount),
         "final_amount": _format_number(final_amount),
-        "payment_clause": _payment_clause(fee_decision.category, gross_amount, tax_rate),
+        "payment_clause": "\n".join(payment_clauses.values()),
+        "payment_clause_1": payment_clauses.get("payment_clause_1", ""),
+        "payment_clause_2": payment_clauses.get("payment_clause_2", ""),
     }
 
 
@@ -100,21 +126,26 @@ def validate_template_context(template_path: Path, context: dict[str, Any]) -> l
 
     context_variables = set(context.keys())
     missing = sorted(template_variables - context_variables)
-    unused = sorted(context_variables - template_variables)
     errors = []
     if missing:
         errors.append(f"템플릿에 필요한 값이 함수 context에 없습니다: {', '.join(missing)}")
-    if unused:
-        errors.append(f"함수 context 값이 템플릿에서 사용되지 않습니다: {', '.join(unused)}")
     return errors
 
 
 def build_output_path(*, person: PersonSourceRow, engagement_type: str, language: str) -> Path:
-    timecode = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    safe_name = sanitize_path_component(person.name or "unknown")
-    directory = settings.OUTPUT_ROOT / engagement_type / f"{person.source_row}_{safe_name}"
-    filename = f"{language}_{safe_name}_{timecode}.docx"
+    timecode = datetime.now(timezone.utc).strftime("%y%m%d-%H%M%f")
+    safe_folder_name = sanitize_path_component(person.name.kor or "unknown")
+    safe_file_name = sanitize_path_component(person_name_for_language(person, language))
+    safe_key = sanitize_path_component(person.key or f"row{person.source_row}")
+    directory = settings.OUTPUT_ROOT / engagement_type / f"{safe_key}_{safe_folder_name}"
+    filename = f"{safe_file_name}_{timecode}.docx"
     return directory / filename
+
+
+def person_name_for_language(person: PersonSourceRow, language: str) -> str:
+    if language == "eng":
+        return person.name.eng or person.name.kor or "unknown"
+    return person.name.kor or person.name.eng or "unknown"
 
 
 def sanitize_path_component(value: str) -> str:
@@ -123,14 +154,25 @@ def sanitize_path_component(value: str) -> str:
     cleaned = cleaned.strip().strip(".")
     return cleaned or "unknown"
 
-
+# 000,000,000 단위로 숫자 포맷팅
 def _format_number(value: int) -> str:
     return f"{value:,}"
 
 
-def _payment_clause(category: str | None, gross_amount: int, tax_rate: float) -> str:
-    if category == "domestic":
-        return f"③ 계약금액 {_format_number(gross_amount)}원에서 {tax_rate}%의 원천징수세액을 공제한 금액을 지급한다."
-    if category == "overseas":
-        return f"③ 국외 노미네이터가 대한민국에 입국하지 않고 추천업무 전부를 해외에서 온라인으로 수행하는 경우에는 대한민국 내 원천징수 없이 계약금액 {_format_number(gross_amount)}원을 지급한다."
-    return "③ 지급 조건은 수동 검토 후 확정한다."
+def _payment_clauses(
+    clauses_by_region: dict[str, dict[str, dict[str, str]]],
+    category: str | None,
+    language: str,
+    gross_amount: int,
+    tax_rate: float,
+) -> dict[str, str]:
+    clauses = clauses_by_region.get(category or "", {}).get(language, {})
+    rendered = {
+        key: clause.format(gross_amount=_format_number(gross_amount), tax_rate=tax_rate)
+        for key, clause in sorted(clauses.items())
+    }
+    if rendered:
+        return rendered
+    raise PaymentClauseError(
+        f"지급 clause 설정을 찾을 수 없습니다. 확인이 필요합니다: category={category or '없음'}, language={language}"
+    )

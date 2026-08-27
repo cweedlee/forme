@@ -5,7 +5,9 @@ from django.http import HttpRequest, JsonResponse
 from django.conf import settings
 from django.shortcuts import render
 from django.urls import path
+from django.views.static import serve
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.cache import never_cache
 
 from config.services.contract_generation import generate_contract_for_person
 from config.services.people_source import load_people_table, load_person_from_workbook
@@ -16,6 +18,7 @@ def health(_: HttpRequest) -> JsonResponse:
 
 
 @ensure_csrf_cookie
+@never_cache
 def people(request: HttpRequest):
     table = load_people_table(settings.UNFOLDX_USER_DATA_WORKBOOK)
     return render(
@@ -28,20 +31,25 @@ def people(request: HttpRequest):
     )
 
 
+@never_cache
 def people_data(_: HttpRequest) -> JsonResponse:
     table = load_people_table(settings.UNFOLDX_USER_DATA_WORKBOOK)
-    return JsonResponse(
+    response = JsonResponse(
         {
             "sheetName": table.sheet_name,
             "workbookPath": str(table.workbook_path),
+            "metadata": table.metadata,
             "columns": table.columns,
             "decisionColumns": table.decision_columns,
             "rows": table.rows,
             "rowCount": len(table.rows),
         }
     )
+    response["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
+@never_cache
 def generate_people_contract(request: HttpRequest) -> JsonResponse:
     if request.method != "POST":
         return JsonResponse({"ok": False, "errors": ["POST만 허용됩니다."]}, status=405)
@@ -49,6 +57,7 @@ def generate_people_contract(request: HttpRequest) -> JsonResponse:
     try:
         payload = json.loads(request.body.decode("utf-8"))
         source_row = int(payload["sourceRow"])
+        language = str(payload.get("language", "kor")).strip()
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return JsonResponse({"ok": False, "errors": ["sourceRow 값이 필요합니다."]}, status=400)
 
@@ -59,7 +68,7 @@ def generate_people_contract(request: HttpRequest) -> JsonResponse:
             status=400,
         )
 
-    result = generate_contract_for_person(person)
+    result = generate_contract_for_person(person, language)
     status = 200 if result.ok else 400
     return JsonResponse(
         {
@@ -71,10 +80,20 @@ def generate_people_contract(request: HttpRequest) -> JsonResponse:
     )
 
 
+@never_cache
+def static_file(request: HttpRequest, path: str):
+    return serve(request, path, document_root=settings.STATIC_ROOT)
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health, name="health"),
     path("people/", people, name="people"),
     path("people/data/", people_data, name="people_data"),
     path("people/generate/", generate_people_contract, name="generate_people_contract"),
+    path(
+        "static/<path:path>",
+        static_file,
+        name="static",
+    ),
 ]

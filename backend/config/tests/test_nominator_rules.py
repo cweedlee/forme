@@ -1,7 +1,13 @@
 from django.test import SimpleTestCase
 
 from config.services.business_rule_config import NominatorRuleConfig, parse_business_rule_config
-from config.services.person_rows import PersonSourceRow, parse_person_source_row
+from config.services.person_rows import PersonName, PersonSourceRow, parse_person_source_row
+from config.services.contract_generation import (
+    PaymentClauseError,
+    _payment_clauses,
+    build_output_path,
+    person_name_for_language,
+)
 from project_config.nominator_rules import decide_nominator_fee
 
 
@@ -57,16 +63,42 @@ class BusinessRuleConfigTests(SimpleTestCase):
     def test_parse_business_rule_config_keeps_user_constants_explicit(self):
         config = parse_business_rule_config(
             {
-                "contract-type": {
+                "contract_type": {
                     "nominator": {
-                        "gross_amount": {"domestic": 500000, "overseas": 800000},
+                        "domestic": {
+                            "gross_amount": 500000,
+                            "tax_type": "other-income",
+                            "payment_clause_1": "계약금액 {gross_amount}원",
+                        },
+                        "overseas": {
+                            "gross_amount": 800000,
+                            "tax_type": "tax-exampt",
+                            "payment_clause_1": {
+                                "kor": "계약금액 {gross_amount}원",
+                                "eng": "Contract amount: {gross_amount} won",
+                            },
+                        },
                     },
                 },
                 "domestic_country_codes": ["KR", "한국"],
+                "tax_type": {
+                    "domestic": {"other-income": 8.8},
+                    "overseas": {"tax-exampt": 0},
+                },
             }
         )
 
         self.assertEqual(config.nominator.gross_amount["domestic"], 500000)
+        self.assertEqual(config.nominator.tax_type["domestic"], "other_income")
+        self.assertEqual(config.nominator.tax_rates["domestic"]["other_income"], 8.8)
+        self.assertEqual(
+            config.nominator.payment_clauses["domestic"]["kor"]["payment_clause_1"],
+            "계약금액 {gross_amount}원",
+        )
+        self.assertEqual(
+            config.nominator.payment_clauses["overseas"]["eng"]["payment_clause_1"],
+            "Contract amount: {gross_amount} won",
+        )
         self.assertIn("KR", config.nominator.domestic_country_codes)
 
 
@@ -74,14 +106,66 @@ class PersonSourceRowTests(SimpleTestCase):
     def test_parse_person_source_row_maps_known_excel_headers(self):
         person = parse_person_source_row(
             source_row=3,
-            headers=["타입", "이름", "영문이름", "국가코드"],
-            values=["노미네이터", "홍길동", "Hong Gil Dong", "KR"],
+            headers=["key", "name_kor", "name_eng", "country_code"],
+            values=["N_01", "홍길동", "Hong Gil Dong", "KR"],
+            default_engagement_type="nominator",
         )
 
-        self.assertEqual(person.engagement_type, "노미네이터")
-        self.assertEqual(person.name, "홍길동")
-        self.assertEqual(person.english_name, "Hong Gil Dong")
+        self.assertEqual(person.engagement_type, "nominator")
+        self.assertEqual(person.key, "N_01")
+        self.assertEqual(person.name.kor, "홍길동")
+        self.assertEqual(person.name.eng, "Hong Gil Dong")
         self.assertEqual(person.country_code, "KR")
+
+
+class ContractLanguageTests(SimpleTestCase):
+    def test_person_name_for_language_uses_english_name_when_requested(self):
+        person = _person(engagement_type="nominator", country_code="KR")
+
+        self.assertEqual(person_name_for_language(person, "kor"), "테스트")
+        self.assertEqual(person_name_for_language(person, "eng"), "Test Person")
+
+    def test_output_folder_uses_key_and_korean_name_but_file_uses_language_name(self):
+        person = _person(engagement_type="nominator", country_code="KR")
+
+        output_path = build_output_path(
+            person=person,
+            engagement_type="nominator",
+            language="eng",
+        )
+
+        self.assertIn("N_TEST_테스트", str(output_path.parent))
+        self.assertTrue(output_path.name.startswith("Test Person_"))
+
+    def test_missing_payment_clause_requires_error_instead_of_fallback(self):
+        with self.assertRaisesRegex(PaymentClauseError, "지급 clause 설정을 찾을 수 없습니다"):
+            _payment_clauses(
+                {"domestic": {"kor": {}, "eng": {}}},
+                "domestic",
+                "kor",
+                gross_amount=500000,
+                tax_rate=8.8,
+            )
+
+    def test_payment_clause_renders_configured_clause(self):
+        clauses = _payment_clauses(
+            {
+                "domestic": {
+                    "kor": {
+                        "payment_clause_1": "계약금액 {gross_amount}원에서 {tax_rate}%를 공제한다."
+                    }
+                }
+            },
+            "domestic",
+            "kor",
+            gross_amount=500000,
+            tax_rate=8.8,
+        )
+
+        self.assertEqual(
+            clauses["payment_clause_1"],
+            "계약금액 500,000원에서 8.8%를 공제한다.",
+        )
 
 
 def _person(*, engagement_type: str, country_code: str) -> PersonSourceRow:
@@ -90,9 +174,10 @@ def _person(*, engagement_type: str, country_code: str) -> PersonSourceRow:
         raw_values=[],
         raw_by_header={},
         engagement_type=engagement_type,
-        name="테스트",
+        name=PersonName(kor="테스트", eng="Test Person"),
         country_code=country_code,
         residence_country=country_code or None,
+        key="N_TEST",
     )
 
 
@@ -102,5 +187,17 @@ def _config(domestic_fee: int | None, overseas_fee: int | None) -> NominatorRule
             "domestic": domestic_fee,
             "overseas": overseas_fee,
         },
+        tax_type={
+            "domestic": "other_income",
+            "overseas": "tax_exempt",
+        },
+        payment_clauses={
+            "domestic": {"kor": {}, "eng": {}},
+            "overseas": {"kor": {}, "eng": {}},
+        },
         domestic_country_codes={"KR", "KOR", "한국", "대한민국"},
+        tax_rates={
+            "domestic": {"other_income": 8.8},
+            "overseas": {"tax_exempt": 0},
+        },
     )

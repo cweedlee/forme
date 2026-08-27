@@ -82,6 +82,11 @@ p {
   white-space: nowrap;
 }
 
+.generate-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .generate-button:disabled {
   cursor: progress;
   opacity: 0.7;

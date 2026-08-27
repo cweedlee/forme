@@ -2,6 +2,9 @@ const refreshButton = document.getElementById("refreshButton");
 const refreshStatus = document.getElementById("refreshStatus");
 const tableMeta = document.getElementById("tableMeta");
 const workbookPath = document.getElementById("workbookPath");
+const workbookMtime = document.getElementById("workbookMtime");
+const rulesSource = document.getElementById("rulesSource");
+const nominatorRules = document.getElementById("nominatorRules");
 const peopleTable = document.getElementById("peopleTable");
 
 function setStatus(message, mode = "idle") {
@@ -50,12 +53,9 @@ function renderTable(data) {
     tableRow.appendChild(textCell("td", row.source_row, "row-number"));
     const actionCell = document.createElement("td");
     if (row.person) {
-      const button = document.createElement("button");
-      button.className = "generate-button";
-      button.type = "button";
-      button.dataset.sourceRow = row.source_row;
-      button.textContent = "생성";
-      actionCell.appendChild(button);
+      actionCell.className = "generate-actions";
+      actionCell.appendChild(generateButton(row.source_row, "kor", "국문"));
+      actionCell.appendChild(generateButton(row.source_row, "eng", "영문"));
     }
     tableRow.appendChild(actionCell);
     for (const value of row.values) {
@@ -68,14 +68,35 @@ function renderTable(data) {
   }
 }
 
+function generateButton(sourceRow, language, label) {
+  const button = document.createElement("button");
+  button.className = "generate-button";
+  button.type = "button";
+  button.dataset.sourceRow = sourceRow;
+  button.dataset.language = language;
+  button.textContent = label;
+  return button;
+}
+
+function renderMetadata(data) {
+  workbookPath.textContent = data.workbookPath;
+  workbookMtime.textContent = data.metadata?.workbook_mtime ?? "";
+  rulesSource.textContent = data.metadata?.rules_source ?? "";
+  nominatorRules.textContent = JSON.stringify(data.metadata?.nominator_gross_amount ?? {});
+}
+
 function csrfToken() {
+  const metaToken = document.querySelector('meta[name="csrf-token"]')?.content;
+  if (metaToken) {
+    return metaToken;
+  }
   const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : "";
 }
 
-async function generateContract(sourceRow, button) {
+async function generateContract(sourceRow, language, button) {
   button.disabled = true;
-  setStatus(`Row ${sourceRow} 계약서 생성 중...`, "loading");
+  setStatus(`Row ${sourceRow} ${language} 계약서 생성 중...`, "loading");
 
   try {
     const response = await fetch("/people/generate/", {
@@ -85,7 +106,7 @@ async function generateContract(sourceRow, button) {
         "Content-Type": "application/json",
         "X-CSRFToken": csrfToken(),
       },
-      body: JSON.stringify({ sourceRow }),
+      body: JSON.stringify({ sourceRow, language }),
     });
     const data = await response.json();
     if (!response.ok || !data.ok) {
@@ -115,7 +136,7 @@ async function refreshPeople() {
     const data = await response.json();
     renderTable(data);
     tableMeta.textContent = `${data.sheetName} · ${data.rowCount} rows`;
-    workbookPath.textContent = data.workbookPath;
+    renderMetadata(data);
     setStatus(`갱신됨 ${new Date().toLocaleTimeString("ko-KR")}`, "ok");
   } catch (error) {
     setStatus(`불러오기 실패: ${error.message}`, "error");
@@ -130,5 +151,5 @@ peopleTable.addEventListener("click", (event) => {
   if (!button) {
     return;
   }
-  generateContract(button.dataset.sourceRow, button);
+  generateContract(button.dataset.sourceRow, button.dataset.language, button);
 });

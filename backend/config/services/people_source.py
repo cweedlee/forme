@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -10,13 +11,15 @@ from config.services.amount_decisions import decide_amounts_for_person
 from config.services.business_rule_config import BusinessRuleConfig, load_business_rule_config
 from config.services.person_rows import (
     PersonSourceRow,
-    is_person_header_row,
+    is_person_code_header_row,
     parse_person_source_row,
 )
 
 
 FIRST_ROW = 1
 FIRST_COLUMN = 1
+CODE_HEADER_ROW = 2
+DATA_FIRST_ROW = 3
 SHEET_DEFAULT_ENGAGEMENT_TYPES = {
     "Nominator": "nominator",
 }
@@ -30,6 +33,7 @@ class WorkbookPeopleTable:
     columns: list[str]
     rows: list[dict[str, Any]]
     decision_columns: list[str]
+    metadata: dict[str, Any]
 
 
 def load_people_table(
@@ -41,8 +45,9 @@ def load_people_table(
     selected_sheet_name = sheet_name or settings.UNFOLDX_USER_DATA_SHEET
     sheet = load_people_sheet(workbook_path, selected_sheet_name)
     columns = read_table_columns(sheet)
-    source_rows = read_non_empty_rows(sheet)
-    rows = build_people_table_rows(source_rows, config, selected_sheet_name)
+    headers = read_code_headers(sheet)
+    source_rows = read_non_empty_rows(sheet, first_row=FIRST_ROW)
+    rows = build_people_table_rows(source_rows, headers, config, selected_sheet_name)
 
     return WorkbookPeopleTable(
         workbook_path=workbook_path,
@@ -50,6 +55,7 @@ def load_people_table(
         columns=columns,
         rows=rows,
         decision_columns=DECISION_COLUMNS,
+        metadata=build_table_metadata(workbook_path, config),
     )
 
 
@@ -60,15 +66,10 @@ def load_person_from_workbook(
 ) -> PersonSourceRow | None:
     selected_sheet_name = sheet_name or settings.UNFOLDX_USER_DATA_SHEET
     sheet = load_people_sheet(workbook_path, selected_sheet_name)
-    rows = read_non_empty_rows(sheet)
-    headers: list[str] | None = None
+    headers = read_code_headers(sheet)
 
-    for row_number, values in rows:
-        if is_person_header_row(values):
-            headers = [str(value or "").strip() for value in values]
-            continue
-
-        if row_number == source_row and headers:
+    for row_number, values in read_non_empty_rows(sheet, first_row=DATA_FIRST_ROW):
+        if row_number == source_row:
             return parse_person_source_row(
                 source_row=row_number,
                 headers=headers,
@@ -96,9 +97,17 @@ def read_table_columns(sheet) -> list[str]:
     ]
 
 
-def read_non_empty_rows(sheet) -> list[tuple[int, list[Any]]]:
+def read_code_headers(sheet) -> list[str]:
+    values = read_row_values(sheet, CODE_HEADER_ROW)
+    if not is_person_code_header_row(values):
+        labels = ", ".join(str(value or "").strip() for value in values if value)
+        raise ValueError(f"2행 코드 헤더가 올바르지 않습니다: {labels}")
+    return [str(value or "").strip() for value in values]
+
+
+def read_non_empty_rows(sheet, *, first_row: int) -> list[tuple[int, list[Any]]]:
     rows: list[dict[str, Any]] = []
-    for row_number in range(FIRST_ROW, sheet.max_row + 1):
+    for row_number in range(first_row, sheet.max_row + 1):
         values = read_row_values(sheet, row_number)
         if _has_any_value(values):
             rows.append((row_number, values))
@@ -112,28 +121,36 @@ def read_row_values(sheet, row_number: int) -> list[Any]:
     ]
 
 
+def build_table_metadata(workbook_path: Path, config: BusinessRuleConfig) -> dict[str, Any]:
+    stat = workbook_path.stat()
+    return {
+        "workbook_mtime": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+        "rules_source": config.source,
+        "nominator_gross_amount": config.nominator.gross_amount,
+        "nominator_tax_type": config.nominator.tax_type,
+    }
+
+
 def build_people_table_rows(
     source_rows: list[tuple[int, list[Any]]],
+    headers: list[str],
     config: BusinessRuleConfig,
     sheet_name: str,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    headers: list[str] | None = None
 
     for row_number, values in source_rows:
-        if is_person_header_row(values):
-            headers = [str(value or "").strip() for value in values]
+        if row_number < DATA_FIRST_ROW:
             rows.append(_build_preview_row(row_number, values))
             continue
 
         person = None
-        if headers:
-            person = parse_person_source_row(
-                source_row=row_number,
-                headers=headers,
-                values=values,
-                default_engagement_type=SHEET_DEFAULT_ENGAGEMENT_TYPES.get(sheet_name),
-            )
+        person = parse_person_source_row(
+            source_row=row_number,
+            headers=headers,
+            values=values,
+            default_engagement_type=SHEET_DEFAULT_ENGAGEMENT_TYPES.get(sheet_name),
+        )
         rows.append(_build_preview_row(row_number, values, person, config))
 
     return rows
@@ -183,9 +200,12 @@ def _serialize_person(person: PersonSourceRow | None) -> dict[str, Any] | None:
     return {
         "source_row": person.source_row,
         "engagement_type": person.engagement_type,
-        "name": person.name,
-        "english_name": person.english_name,
+        "name": {
+            "kor": person.name.kor,
+            "eng": person.name.eng,
+        },
         "country_code": person.country_code,
         "residence_country": person.residence_country,
+        "key": person.key,
         "raw_by_header": person.raw_by_header,
     }
