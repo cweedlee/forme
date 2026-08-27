@@ -1,0 +1,69 @@
+{% load static table_extras %}
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UnfoldX People</title>
+    <link rel="stylesheet" href="{% static 'people.css' %}">
+  </head>
+  <body>
+    <main class="page">
+      <header class="toolbar">
+        <div>
+          <h1>UnfoldX People</h1>
+          <p id="tableMeta">{{ table.sheet_name }} · {{ row_count }} rows</p>
+        </div>
+        <div class="actions">
+          <button class="refresh-button" id="refreshButton" type="button">
+            <span aria-hidden="true">↻</span>
+            <span>현재 파일 불러오기</span>
+          </button>
+          <a class="link-button" href="/health/">Health</a>
+        </div>
+      </header>
+
+      <section class="source">
+        <span>Source</span>
+        <code id="workbookPath">{{ table.workbook_path }}</code>
+        <span class="status" id="refreshStatus" aria-live="polite"></span>
+      </section>
+
+      <section class="table-wrap" aria-label="People source table">
+        <table id="peopleTable">
+          <thead>
+            <tr>
+              <th>Row</th>
+              {% for column in table.columns %}
+                <th>{{ column }}</th>
+              {% endfor %}
+              {% for column in table.decision_columns %}
+                <th class="decision-head">{{ column }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in table.rows %}
+              <tr>
+                <td class="row-number">{{ row|get_item:"source_row" }}</td>
+                {% for value in row|get_item:"values" %}
+                  <td>{{ value|default_if_none:"" }}</td>
+                {% endfor %}
+                {% with decisions=row|get_item:"decisions" %}
+                  {% for column in table.decision_columns %}
+                    <td class="decision-cell">{{ decisions|get_item:column|default_if_none:"" }}</td>
+                  {% endfor %}
+                {% endwith %}
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="{{ table.columns|length|add:table.decision_columns|length|add:1 }}" class="empty">표시할 행이 없습니다.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </main>
+    <script src="{% static 'people.js' %}"></script>
+  </body>
+</html>

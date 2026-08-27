@@ -11,10 +11,12 @@ services:
       DJANGO_DEBUG: "${DJANGO_DEBUG:-0}"
       DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}"
       DATA_ROOT: /app/data
+      SYNCED_DATA_ROOT: /app/data/synced_data
       SESSION_COOKIE_AGE: "${SESSION_COOKIE_AGE:-15552000}"
       TZ: "${TZ:-Asia/Seoul}"
     volumes:
       - ./data:/app/data
+      - /Users/haecho/Library/CloudStorage/OneDrive-주식회사마인드디자인:/app/data/synced_data/onedrive:ro
     read_only: true
     tmpfs:
       - /tmp
