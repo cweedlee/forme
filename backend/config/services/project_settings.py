@@ -119,9 +119,6 @@ def validate_project_config(config: ProjectRuntimeConfig) -> None:
     for engagement_type, language_templates in config.templates.items():
         if not language_templates:
             raise ValueError(f"프로젝트 템플릿 설정이 비어 있습니다: {engagement_type}")
-        for language, template in language_templates.items():
-            if not template.path.exists():
-                raise ValueError(f"프로젝트 템플릿 파일을 찾을 수 없습니다: {language}: {template.path}")
 
 
 def _parse_language_templates(raw_templates: dict[str, Any]) -> dict[str, TemplateConfig]:

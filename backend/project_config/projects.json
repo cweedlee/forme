@@ -1,7 +1,7 @@
 {
   "unfoldx_2026": {
     "label": "UnfoldX 2026",
-    "workbook": "data/synced_data/onedrive/민 소연의 파일 - 00_계약 데스크/02. 언폴드엑스2026_계약대상자별 정리.xlsx",
+    "workbook": "data/synced_data/OneDrive - 주식회사 마인드디자인/민 소연의 파일 - 00_계약 데스크/02. 언폴드엑스2026_계약대상자별 정리.xlsx",
     "people_sheets": {
       "nominator": "Nominator"
     },
@@ -17,7 +17,7 @@
     "templates": {
       "nominator": {
         "kor": {
-          "path": "data/synced_data/onedrive/민 소연의 파일 - 00_계약 데스크/template-nominator-kor.docx",
+          "path": "data/synced_data/OneDrive - 주식회사 마인드디자인/민 소연의 파일 - 00_계약 데스크/template-nominator-kor.docx",
           "version": 1
         },
         "eng": {

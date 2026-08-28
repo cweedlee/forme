@@ -16,7 +16,7 @@ services:
       TZ: "${TZ:-Asia/Seoul}"
     volumes:
       - ./data:/app/data
-      - /Users/haecho/Library/CloudStorage/OneDrive-주식회사마인드디자인:/app/data/synced_data/onedrive:ro
+      - ${ONEDRIVE_HOST_PATH:-./data/synced_data}:/app/data/synced_data:ro
     read_only: true
     tmpfs:
       - /tmp
