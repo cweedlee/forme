@@ -3,8 +3,7 @@ const refreshStatus = document.getElementById("refreshStatus");
 const tableMeta = document.getElementById("tableMeta");
 const workbookPath = document.getElementById("workbookPath");
 const workbookMtime = document.getElementById("workbookMtime");
-const rulesSource = document.getElementById("rulesSource");
-const nominatorRules = document.getElementById("nominatorRules");
+const sourceMode = document.getElementById("sourceMode");
 const peopleTable = document.getElementById("peopleTable");
 const healthCheckButton = document.getElementById("healthCheckButton");
 const contractPage = document.getElementById("contractPage");
@@ -96,11 +95,8 @@ function renderMetadata(data) {
   if (workbookMtime) {
     workbookMtime.textContent = data.metadata?.workbook_mtime ?? "";
   }
-  if (rulesSource) {
-    rulesSource.textContent = data.metadata?.rules_source ?? "";
-  }
-  if (nominatorRules) {
-    nominatorRules.textContent = JSON.stringify(data.metadata?.nominator_gross_amount ?? {});
+  if (sourceMode) {
+    sourceMode.textContent = data.metadata?.source_mode ?? "";
   }
 }
 

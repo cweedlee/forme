@@ -5,19 +5,19 @@
     "people_sheets": {
       "nominator": "Nominator"
     },
+    "country_code_sheet": "country_code",
     "people_layouts": {
       "nominator": {
         "nature_header_row": 8, 
-        "code_header_row": 9,
+        "code_header_row": 8,
         "data_first_row": 10,
-        "visible_columns": ["key", "person-name-kor", "person-name-eng", "country-code", "gross-amount", "tax-rate", "tax-type"]
+        "visible_columns": ["식별자", "국문 성명", "영문 성명", "계약체결일", "세법상 거주국", "계약금액", "원천징수율", "소득종류"]
       }
     },
-    "rules_sheet": "Rules",
     "templates": {
       "nominator": {
         "kor": {
-          "path": "data/templates/norminator-kor.docx",
+          "path": "data/synced_data/onedrive/민 소연의 파일 - 00_계약 데스크/template-nominator-kor.docx",
           "version": 1
         },
         "eng": {

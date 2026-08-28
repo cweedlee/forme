@@ -1,63 +1,69 @@
 from typing import Any
 
-from config.services.business_rule_config import load_business_rule_config
 from config.services.contract_generation import optional_clause_value, person_name_for_language
+from config.services.country_codes import resolve_country_code
 from config.services.person_rows import PersonSourceRow
-from project_config.nominator_rules import decide_nominator_fee
 
 
-class PaymentClauseError(ValueError):
-    pass
+NOMINATOR_CONTEXT_FIELDS = {
+    "contract_date": {"계약체결일"},
+    "tax_residence": {"세법상 거주국", "국가"},
+    "workplace": {"업무수행장소"},
+    "gross_amount": {"계약금액"},
+    "income_type": {"소득종류"},
+    "tax_rate": {"원천징수율"},
+    "tax_amount": {"원천징수세액(KRW)"},
+    "final_amount": {"최종 지급액"},
+}
 
 
 def build_nominator_context(person: PersonSourceRow, language: str = "kor") -> dict[str, Any]:
     validate_nominator_person(person, language)
-    config = load_business_rule_config()
-    fee_decision = decide_nominator_fee(person, config.nominator)
-    if fee_decision.status != "READY":
-        raise ValueError(f"노미네이터 금액을 확정할 수 없습니다: {fee_decision.reason}")
-
-    category = require_value(fee_decision.category, "nominator category")
-    gross_amount = require_value(fee_decision.amount_krw, "gross_amount")
-    tax_type = require_value(config.nominator.tax_type.get(category), f"tax_type.{category}")
-    tax_rate = require_value(
-        config.nominator.tax_rates.get(category, {}).get(tax_type),
-        f"tax_rate.{category}.{tax_type}",
-    )
+    source_values = read_nominator_source_values(person)
+    gross_amount = source_values["gross_amount"]
+    tax_rate = source_values["tax_rate"]
+    tax_amount = source_values["tax_amount"]
+    final_amount = source_values["final_amount"]
+    tax_type = source_values["income_type"]
+    residence_country = source_values["tax_residence"]
+    workplace = source_values["workplace"]
+    country_code = resolve_country_code(residence_country)
+    category = "domestic" if workplace == "대한민국" else "overseas"
     template_flags = build_template_condition_flags(category=category, tax_type=tax_type)
-    tax_amount = round(gross_amount * tax_rate / 100)
-    final_amount = gross_amount - tax_amount
-    payment_clauses = _payment_clauses(
-        config.nominator.payment_clauses,
-        fee_decision.category,
-        language,
-        gross_amount,
-        tax_rate,
-    )
     return {
         "participant_name": person_name_for_language(person, language),
+        "person_name_kor": person.name.kor,
+        "person_name_eng": person.name.eng or "",
         "participant_name_kor": person.name.kor,
-        "participant_name_eng": require_value(person.name.eng, "person-name-eng"),
+        "participant_name_eng": person.name.eng or "",
         "person_key": person.key,
-        "country_code": person.country_code,
+        "country_code": country_code,
+        "contract_date": source_values["contract_date"],
+        "contract_sign_date": source_values["contract_date"],
+        "residence_country": residence_country,
+        "tax_residence": residence_country,
+        "workplace": workplace,
+        "work_location": workplace,
+        "income_type": source_values["income_type"],
         "tax_type": tax_type,
         **template_flags,
         "gross_amount": _format_number(gross_amount),
-        "tax_rate": tax_rate,
+        "tax_rate": _format_rate(tax_rate),
         "tax_amount": _format_number(tax_amount),
         "final_amount": _format_number(final_amount),
-        "payment_clause": "\n".join(payment_clauses.values()),
-        "payment_clause_1": require_value(payment_clauses.get("payment_clause_1"), "payment_clause_1"),
-        "payment_clause_2": optional_clause_value(payment_clauses, "payment_clause_2"),
+        "payment_clause": "",
+        "payment_clause_1": "",
+        "payment_clause_2": optional_clause_value({}, "payment_clause_2"),
     }
 
 
 def build_template_condition_flags(*, category: str, tax_type: str) -> dict[str, bool]:
+    is_tax_exempt = tax_type in {"해당없음", "tax_exempt"}
     return {
         "is_domestic": category == "domestic",
         "is_overseas": category == "overseas",
-        "needs_withholding": tax_type != "tax_exempt",
-        "is_tax_exempt": tax_type == "tax_exempt",
+        "needs_withholding": not is_tax_exempt,
+        "is_tax_exempt": is_tax_exempt,
         "needs_wire_transfer_clause": category == "overseas",
     }
 
@@ -67,7 +73,8 @@ def validate_nominator_person(person: PersonSourceRow, language: str) -> None:
     require_value(person.name.kor, "person-name-kor")
     if language == "eng":
         require_value(person.name.eng, "person-name-eng")
-    require_value(person.country_code, "country-code")
+    require_value(person.residence_country, "residence_country")
+    require_value(person.workplace, "workplace")
 
 
 def require_value(value: Any, field_name: str):
@@ -76,26 +83,35 @@ def require_value(value: Any, field_name: str):
     return value
 
 
-# 000,000,000 단위로 숫자 포맷팅
-def _format_number(value: int) -> str:
-    return f"{value:,}"
-
-
-def _payment_clauses(
-    clauses_by_region: dict[str, dict[str, dict[str, str]]],
-    category: str | None,
-    language: str,
-    gross_amount: int,
-    tax_rate: float,
-) -> dict[str, str]:
-    category = require_value(category, "payment_clause category")
-    clauses = clauses_by_region.get(category, {}).get(language, {})
-    rendered = {
-        key: clause.format(gross_amount=_format_number(gross_amount), tax_rate=tax_rate)
-        for key, clause in sorted(clauses.items())
+def read_nominator_source_values(person: PersonSourceRow) -> dict[str, Any]:
+    return {
+        field_name: require_value(
+            _mapped_value(person.raw_by_header, aliases),
+            field_name,
+        )
+        for field_name, aliases in NOMINATOR_CONTEXT_FIELDS.items()
     }
-    if rendered:
-        return rendered
-    raise PaymentClauseError(
-        f"지급 clause 설정을 찾을 수 없습니다. 확인이 필요합니다: category={category or '없음'}, language={language}"
-    )
+
+
+def _mapped_value(row: dict[str, Any], aliases: set[str]) -> Any:
+    normalized_aliases = {_normalize_header(alias) for alias in aliases}
+    for header, value in row.items():
+        if _normalize_header(header) in normalized_aliases:
+            return value
+    return None
+
+
+def _normalize_header(value: Any) -> str:
+    return str(value or "").strip().replace("-", "_").lower()
+
+
+# 000,000,000 단위로 숫자 포맷팅
+def _format_number(value: Any) -> str:
+    return f"{round(float(value)):,}"
+
+
+def _format_rate(value: Any) -> str:
+    numeric = float(value)
+    if 0 <= numeric <= 1:
+        numeric *= 100
+    return f"{numeric:g}%"

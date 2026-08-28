@@ -3,14 +3,15 @@ from typing import Any
 
 
 HEADER_ALIASES = {
-    "key": {"key", "person_key", "kor_key", "KOR_KEY"},
+    "key": {"key", "person_key", "kor_key", "KOR_KEY", "식별자", "구분"},
     "name_kor": {"name_kor", "person_name_kor", "국문 이름", "국문 성명", "이름", "성명"},
     "name_eng": {"name_eng", "person_name_eng", "english_name", "영문 이름", "영문 성명", "영문이름", "영문명"},
-    "country_code": {"country_code", "국가코드", "세법상 거주국"},
-    "residence_country": {"residence_country", "거주지", "거주국", "세법상 거주국", "country_code", "국가코드"},
+    "country_code": {"country_code", "국가코드"},
+    "residence_country": {"residence_country", "거주지", "거주국", "세법상 거주국", "국가"},
+    "workplace": {"workplace", "work_location", "업무수행장소", "수행장소"},
 }
 
-REQUIRED_FIELDS = {"key", "name_kor", "name_eng", "country_code"}
+REQUIRED_FIELDS = {"key", "name_kor", "name_eng", "residence_country"}
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class PersonSourceRow:
     name: PersonName
     country_code: str
     residence_country: str | None = None
+    workplace: str | None = None
 
 
 def is_person_code_header_row(values: list[Any]) -> bool:
@@ -59,6 +61,7 @@ def parse_person_source_row(
         ),
         country_code=str(_find_value(raw_by_header, "country_code") or "").strip(),
         residence_country=_optional_str(_find_value(raw_by_header, "residence_country")),
+        workplace=_optional_str(_find_value(raw_by_header, "workplace")),
     )
 
 

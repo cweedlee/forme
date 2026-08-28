@@ -95,6 +95,8 @@ def validate_template_context(template_path: Path, context: dict[str, Any]) -> l
         template = DocxTemplate(template_path)
         template_variables = template.get_undeclared_template_variables()
     except TemplateSyntaxError as exc:
+        if "unknown tag 'p'" in str(exc):
+            return []
         return [f"템플릿 변수 문법 오류: {exc.message}"]
 
     context_variables = set(context.keys())

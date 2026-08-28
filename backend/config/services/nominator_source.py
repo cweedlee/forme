@@ -6,8 +6,6 @@ from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
 
-from config.services.amount_decisions import decide_amounts_for_person
-from config.services.business_rule_config import BusinessRuleConfig, load_business_rule_config
 from config.services.person_rows import (
     PersonSourceRow,
     is_person_code_header_row,
@@ -20,8 +18,19 @@ FIRST_COLUMN = 1
 CODE_HEADER_ROW = 2
 DATA_FIRST_ROW = 3
 ENGAGEMENT_TYPE = "nominator"
-DECISION_COLUMNS = ["노미네이터 금액상태", "노미네이터 금액", "노미네이터 근거"]
+DECISION_COLUMNS = ["계약서 상태", "검증 메시지"]
 SEOUL_TZ = ZoneInfo("Asia/Seoul")
+REQUIRED_CONTEXT_FIELDS = {
+    "key": {"식별자", "key"},
+    "person_name_kor": {"국문 성명", "국문 이름", "성명"},
+    "tax_residence": {"세법상 거주국", "국가"},
+    "work_location": {"업무수행장소"},
+    "gross_amount": {"계약금액"},
+    "income_type": {"소득종류"},
+    "tax_rate": {"원천징수율"},
+    "tax_amount": {"원천징수세액(KRW)"},
+    "final_amount": {"최종 지급액"},
+}
 
 
 @dataclass(frozen=True)
@@ -36,10 +45,8 @@ class NominatorWorkbookTable:
 
 def load_nominator_table(
     workbook_path: Path,
-    rule_config: BusinessRuleConfig | None = None,
     sheet_name: str | None = None,
 ) -> NominatorWorkbookTable:
-    config = rule_config or load_business_rule_config()
     project_config = load_project_config()
     selected_sheet_name = sheet_name or project_config.people_sheet_for("nominator")
     layout = project_config.people_layout_for("nominator")
@@ -53,7 +60,6 @@ def load_nominator_table(
         source_rows,
         headers,
         visible_indexes,
-        config,
         selected_sheet_name,
         layout["data_first_row"],
     )
@@ -64,7 +70,7 @@ def load_nominator_table(
         columns=columns,
         rows=rows,
         decision_columns=DECISION_COLUMNS,
-        metadata=build_table_metadata(workbook_path, config),
+        metadata=build_table_metadata(workbook_path),
     )
 
 
@@ -125,13 +131,11 @@ def read_row_values(sheet, row_number: int) -> list[Any]:
     ]
 
 
-def build_table_metadata(workbook_path: Path, config: BusinessRuleConfig) -> dict[str, Any]:
+def build_table_metadata(workbook_path: Path) -> dict[str, Any]:
     stat = workbook_path.stat()
     return {
         "workbook_mtime": datetime.fromtimestamp(stat.st_mtime, tz=SEOUL_TZ).isoformat(),
-        "rules_source": config.source,
-        "nominator_gross_amount": config.nominator.gross_amount,
-        "nominator_tax_type": config.nominator.tax_type,
+        "source_mode": "xlsx:nominator-sheet",
     }
 
 
@@ -139,7 +143,6 @@ def build_nominator_table_rows(
     source_rows: list[tuple[int, list[Any]]],
     headers: list[str],
     visible_indexes: list[int],
-    config: BusinessRuleConfig,
     sheet_name: str,
     data_first_row: int = DATA_FIRST_ROW,
 ) -> list[dict[str, Any]]:
@@ -162,9 +165,8 @@ def build_nominator_table_rows(
             engagement_type=ENGAGEMENT_TYPE,
         )
         if not _has_person_identity(person):
-            rows.append(_build_preview_row(row_number, visible_values))
             continue
-        rows.append(_build_preview_row(row_number, visible_values, person, config))
+        rows.append(_build_preview_row(row_number, visible_values, person))
 
     return rows
 
@@ -206,7 +208,7 @@ def _has_any_value(values: list[Any]) -> bool:
 
 
 def _has_person_identity(person: PersonSourceRow) -> bool:
-    return bool(person.key or person.name.kor or person.name.eng or person.country_code)
+    return bool(person.key or person.name.kor or person.residence_country)
 
 
 def _normalize_header(value: Any) -> str:
@@ -217,7 +219,6 @@ def _build_preview_row(
     row_number: int,
     values: list[Any],
     person: PersonSourceRow | None = None,
-    config: BusinessRuleConfig | None = None,
 ) -> dict[str, Any]:
     row = {
         "source_row": row_number,
@@ -225,14 +226,38 @@ def _build_preview_row(
         "decisions": {},
         "person": _serialize_person(person) if person else None,
     }
-    if person and config:
-        decision = decide_amounts_for_person(person, config)
-        row["decisions"] = {
-            "노미네이터 금액상태": decision["nominator_fee_status"],
-            "노미네이터 금액": _format_krw(decision["nominator_fee_krw"]),
-            "노미네이터 근거": decision["nominator_fee_reason"],
-        }
+    if person:
+        row["decisions"] = build_row_decisions(person)
     return row
+
+
+def build_row_decisions(person: PersonSourceRow) -> dict[str, str]:
+    missing = missing_required_context_fields(person)
+    if missing:
+        return {
+            "계약서 상태": "ERROR",
+            "검증 메시지": "필수값 누락: " + ", ".join(missing),
+        }
+    return {
+        "계약서 상태": "READY",
+        "검증 메시지": "Excel 계산값 사용",
+    }
+
+
+def missing_required_context_fields(person: PersonSourceRow) -> list[str]:
+    missing = []
+    for field_name, aliases in REQUIRED_CONTEXT_FIELDS.items():
+        if _mapped_value(person.raw_by_header, aliases) in (None, ""):
+            missing.append(field_name)
+    return missing
+
+
+def _mapped_value(row: dict[str, Any], aliases: set[str]) -> Any:
+    normalized_aliases = {_normalize_header(alias) for alias in aliases}
+    for header, value in row.items():
+        if _normalize_header(header) in normalized_aliases:
+            return value
+    return None
 
 
 def _format_krw(value: Any) -> str:
@@ -253,6 +278,7 @@ def _serialize_person(person: PersonSourceRow | None) -> dict[str, Any] | None:
         },
         "country_code": person.country_code,
         "residence_country": person.residence_country,
+        "workplace": person.workplace,
         "key": person.key,
         "raw_by_header": person.raw_by_header,
     }

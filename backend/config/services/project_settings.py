@@ -30,8 +30,8 @@ class ProjectRuntimeConfig:
     label: str
     workbook_path: Path
     people_sheets: dict[str, str]
+    country_code_sheet: str
     people_layouts: dict[str, dict[str, Any]]
-    rules_sheet: str
     templates: dict[str, dict[str, TemplateConfig]]
     output_root: Path
 
@@ -102,8 +102,8 @@ def parse_project_config(slug: str, raw_project: dict[str, Any]) -> ProjectRunti
         label=str(raw_project.get("label") or slug),
         workbook_path=_resolve_project_path(raw_project["workbook"]),
         people_sheets=people_sheets,
+        country_code_sheet=str(raw_project.get("country_code_sheet") or "country-code"),
         people_layouts=people_layouts,
-        rules_sheet=str(raw_project.get("rules_sheet") or "Rules"),
         templates=templates,
         output_root=_resolve_project_path(raw_project.get("output_root") or "data/output"),
     )
