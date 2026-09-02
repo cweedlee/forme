@@ -77,8 +77,8 @@
                 {% endwith %}
                   <td class="decision-cell">
                   {% if row|get_item:"person" %}
-                    <button class="generate-button" type="button" data-source-row="{{ row|get_item:"source_row" }}" data-language="kor">국문</button>
-                    <button class="generate-button" type="button" data-source-row="{{ row|get_item:"source_row" }}" data-language="eng">영문</button>
+                    <button class="generate-button" type="button" data-data-key="{{ row|get_item:"data_key" }}" data-language="kor">국문</button>
+                    <button class="generate-button" type="button" data-data-key="{{ row|get_item:"data_key" }}" data-language="eng">영문</button>
                   {% endif %}
                 </td>
               </tr>

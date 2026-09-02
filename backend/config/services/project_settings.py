@@ -29,34 +29,26 @@ class ProjectRuntimeConfig:
     slug: str
     label: str
     workbook_path: Path
-    people_sheets: dict[str, str]
+    sheets: dict[str, str]
     country_code_sheet: str
-    people_layouts: dict[str, dict[str, Any]]
-    templates: dict[str, dict[str, TemplateConfig]]
+    data_sheet_layout: dict[str, int | str]
+    template_folder: Path
     output_root: Path
 
     def people_sheet_for(self, engagement_type: str) -> str:
         try:
-            return self.people_sheets[engagement_type]
+            return self.sheets[engagement_type]
         except KeyError as exc:
             raise ValueError(f"프로젝트 설정에 people sheet가 없습니다: {engagement_type}") from exc
 
-    def people_layout_for(self, engagement_type: str) -> dict[str, Any]:
-        return self.people_layouts.get(
-            engagement_type,
-            {
-                "nature_header_row": 1,
-                "code_header_row": 2,
-                "data_first_row": 3,
-                "visible_columns": [],
-            },
-        )
-
     def template_for(self, engagement_type: str, language: str) -> TemplateConfig:
-        try:
-            return self.templates[engagement_type][language]
-        except KeyError as exc:
-            raise ValueError(f"프로젝트 설정에 템플릿이 없습니다: {engagement_type}/{language}") from exc
+        _validate_language(language)
+        if engagement_type not in self.sheets:
+            raise ValueError(f"프로젝트 설정에 sheet가 없습니다: {engagement_type}")
+        return TemplateConfig(
+            path=self.template_folder / f"template-{engagement_type}-{language}.docx",
+            version=1,
+        )
 
 
 @lru_cache(maxsize=8)
@@ -75,36 +67,28 @@ def load_project_config(project_slug: str | None = None) -> ProjectRuntimeConfig
 
 
 def parse_project_config(slug: str, raw_project: dict[str, Any]) -> ProjectRuntimeConfig:
-    people_sheets = {
-        _validate_engagement_type(engagement_type): str(sheet_name).strip()
-        for engagement_type, sheet_name in (raw_project.get("people_sheets") or {}).items()
+    sheets = {
+        str(sheet_key).strip(): str(sheet_name).strip()
+        for sheet_key, sheet_name in (raw_project.get("sheets") or {}).items()
+        if str(sheet_key).strip()
         if str(sheet_name).strip()
     }
-    people_layouts = {
-        _validate_engagement_type(engagement_type): {
-            "nature_header_row": int(layout.get("nature_header_row") or 1),
-            "code_header_row": int(layout.get("code_header_row") or 2),
-            "data_first_row": int(layout.get("data_first_row") or 3),
-            "visible_columns": [
-                str(column).strip()
-                for column in layout.get("visible_columns", [])
-                if str(column).strip()
-            ],
-        }
-        for engagement_type, layout in (raw_project.get("people_layouts") or {}).items()
-    }
-    templates = {
-        _validate_engagement_type(engagement_type): _parse_language_templates(language_templates)
-        for engagement_type, language_templates in (raw_project.get("templates") or {}).items()
+    raw_layout = raw_project.get("data-sheet-layout") or {}
+    data_sheet_layout: dict[str, int | str] = {
+        "data_row": int(raw_layout.get("data-row") or 0),
+        "data_column": int(raw_layout.get("data-column") or 0),
+        "name_row": int(raw_layout.get("name-row") or 0),
+        "var_row": int(raw_layout.get("var-row") or 0),
+        "data_key": str(raw_layout.get("data-key") or "").strip(),
     }
     config = ProjectRuntimeConfig(
         slug=slug,
         label=str(raw_project.get("label") or slug),
         workbook_path=_resolve_project_path(raw_project["workbook"]),
-        people_sheets=people_sheets,
+        sheets=sheets,
         country_code_sheet=str(raw_project.get("country_code_sheet") or "country-code"),
-        people_layouts=people_layouts,
-        templates=templates,
+        data_sheet_layout=data_sheet_layout,
+        template_folder=_resolve_project_path(raw_project["template_folder"]),
         output_root=_resolve_project_path(raw_project.get("output_root") or "data/output"),
     )
     validate_project_config(config)
@@ -114,21 +98,11 @@ def parse_project_config(slug: str, raw_project: dict[str, Any]) -> ProjectRunti
 def validate_project_config(config: ProjectRuntimeConfig) -> None:
     if not config.workbook_path.exists():
         raise ValueError(f"프로젝트 workbook 파일을 찾을 수 없습니다: {config.workbook_path}")
-    if not config.people_sheets:
-        raise ValueError("프로젝트 people_sheets 설정이 비어 있습니다.")
-    for engagement_type, language_templates in config.templates.items():
-        if not language_templates:
-            raise ValueError(f"프로젝트 템플릿 설정이 비어 있습니다: {engagement_type}")
-
-
-def _parse_language_templates(raw_templates: dict[str, Any]) -> dict[str, TemplateConfig]:
-    return {
-        _validate_language(language): TemplateConfig(
-            path=_resolve_project_path(raw_template["path"]),
-            version=int(raw_template.get("version") or 1),
-        )
-        for language, raw_template in raw_templates.items()
-    }
+    if not config.sheets:
+        raise ValueError("프로젝트 sheets 설정이 비어 있습니다.")
+    for field_name, value in config.data_sheet_layout.items():
+        if value in (0, ""):
+            raise ValueError(f"프로젝트 data-sheet-layout 설정이 비어 있습니다: {field_name}")
 
 
 def _resolve_project_path(value: str | Path) -> Path:

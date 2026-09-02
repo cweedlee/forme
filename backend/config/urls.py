@@ -27,10 +27,7 @@ def index(request: HttpRequest):
 @never_cache
 def nominator(request: HttpRequest):
     project_config = load_project_config()
-    table = load_nominator_table(
-        project_config.workbook_path,
-        sheet_name=project_config.people_sheet_for("nominator"),
-    )
+    table = load_nominator_table(project_config.workbook_path)
     return render(
         request,
         "nominator.html",
@@ -46,10 +43,7 @@ def nominator(request: HttpRequest):
 @never_cache
 def nominator_data(_: HttpRequest) -> JsonResponse:
     project_config = load_project_config()
-    table = load_nominator_table(
-        project_config.workbook_path,
-        sheet_name=project_config.people_sheet_for("nominator"),
-    )
+    table = load_nominator_table(project_config.workbook_path)
     response = JsonResponse(
         {
             "sheetName": table.sheet_name,
@@ -72,20 +66,21 @@ def generate_nominator_contract(request: HttpRequest) -> JsonResponse:
 
     try:
         payload = json.loads(request.body.decode("utf-8"))
-        source_row = int(payload["sourceRow"])
+        data_key = str(payload["dataKey"]).strip()
         language = str(payload.get("language", "kor")).strip()
+        if not data_key:
+            raise ValueError
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
-        return JsonResponse({"ok": False, "errors": ["sourceRow 값이 필요합니다."]}, status=400)
+        return JsonResponse({"ok": False, "errors": ["dataKey 값이 필요합니다."]}, status=400)
 
     project_config = load_project_config()
     person = load_nominator_person_from_workbook(
         project_config.workbook_path,
-        source_row,
-        sheet_name=project_config.people_sheet_for("nominator"),
+        data_key,
     )
     if not person:
         return JsonResponse(
-            {"ok": False, "errors": [f"source row {source_row}에서 참여자 객체를 만들 수 없습니다."]},
+            {"ok": False, "errors": [f"data-key {data_key}에서 참여자 객체를 만들 수 없습니다."]},
             status=400,
         )
 

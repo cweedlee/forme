@@ -6,14 +6,14 @@ from config.services.person_rows import PersonSourceRow
 
 
 NOMINATOR_CONTEXT_FIELDS = {
-    "contract_date": {"계약체결일"},
-    "tax_residence": {"세법상 거주국", "국가"},
-    "workplace": {"업무수행장소"},
-    "gross_amount": {"계약금액"},
-    "income_type": {"소득종류"},
-    "tax_rate": {"원천징수율"},
-    "tax_amount": {"원천징수세액(KRW)"},
-    "final_amount": {"최종 지급액"},
+    "contract_date": {"contract_sign_date", "계약체결일"},
+    "tax_residence": {"residence_country", "세법상 거주국", "국가"},
+    "workplace": {"workplace", "업무수행장소"},
+    "gross_amount": {"gross_amount", "계약금액"},
+    "income_type": {"income_type", "소득종류"},
+    "tax_rate": {"tax_rate", "원천징수율"},
+    "tax_amount": {"tax_amount", "원천징수세액(KRW)"},
+    "final_amount": {"final_amount", "최종 지급액"},
 }
 
 

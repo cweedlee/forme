@@ -2,30 +2,19 @@
   "unfoldx_2026": {
     "label": "UnfoldX 2026",
     "workbook": "data/synced_data/OneDrive - 주식회사 마인드디자인/민 소연의 파일 - 00_계약 데스크/02. 언폴드엑스2026_계약대상자별 정리.xlsx",
-    "people_sheets": {
+    "sheets": {
+      "test": "Test",
       "nominator": "Nominator"
     },
+    "data-sheet-layout":{
+      "data-row": 10,
+      "data-column": 2,
+      "name-row": 8,
+      "var-row": 9,
+      "data-key": "key"
+    },
     "country_code_sheet": "country_code",
-    "people_layouts": {
-      "nominator": {
-        "nature_header_row": 8, 
-        "code_header_row": 9,
-        "data_first_row": 10,
-        "visible_columns": ["식별자", "국문 성명", "영문 성명", "계약체결일", "세법상 거주국", "계약금액", "원천징수율", "소득종류"]
-      }
-    },
-    "templates": {
-      "nominator": {
-        "kor": {
-          "path": "data/synced_data/OneDrive - 주식회사 마인드디자인/민 소연의 파일 - 00_계약 데스크/templates/template-nominator-kor.docx",
-          "version": 1
-        },
-        "eng": {
-          "path": "data/templates/norminator-eng.docx",
-          "version": 1
-        }
-      }
-    },
-    "output_root": "data/output"
+    "output_root": "data/output",
+    "template_folder": "data/synced_data/OneDrive - 주식회사 마인드디자인/민 소연의 파일 - 00_계약 데스크/templates"
   }
 }

@@ -64,8 +64,8 @@ function renderTable(data) {
     const actionCell = document.createElement("td");
     if (row.person) {
       actionCell.className = "generate-actions";
-      actionCell.appendChild(generateButton(row.source_row, "kor", "국문"));
-      actionCell.appendChild(generateButton(row.source_row, "eng", "영문"));
+      actionCell.appendChild(generateButton(row.data_key, "kor", "국문"));
+      actionCell.appendChild(generateButton(row.data_key, "eng", "영문"));
     }
     tableRow.appendChild(actionCell);
     for (const value of row.values) {
@@ -78,11 +78,11 @@ function renderTable(data) {
   }
 }
 
-function generateButton(sourceRow, language, label) {
+function generateButton(dataKey, language, label) {
   const button = document.createElement("button");
   button.className = "generate-button";
   button.type = "button";
-  button.dataset.sourceRow = sourceRow;
+  button.dataset.dataKey = dataKey;
   button.dataset.language = language;
   button.textContent = label;
   return button;
@@ -109,9 +109,9 @@ function csrfToken() {
   return match ? decodeURIComponent(match[1]) : "";
 }
 
-async function generateContract(sourceRow, language, button) {
+async function generateContract(dataKey, language, button) {
   button.disabled = true;
-  setStatus(`Row ${sourceRow} ${language} 계약서 생성 중...`, "loading");
+  setStatus(`${dataKey} ${language} 계약서 생성 중...`, "loading");
 
   try {
     const response = await fetch(generateUrl, {
@@ -121,7 +121,7 @@ async function generateContract(sourceRow, language, button) {
         "Content-Type": "application/json",
         "X-CSRFToken": csrfToken(),
       },
-      body: JSON.stringify({ sourceRow, language }),
+      body: JSON.stringify({ dataKey, language }),
     });
     const data = await response.json();
     if (!response.ok || !data.ok) {
@@ -203,7 +203,7 @@ if (peopleTable) {
     if (!button) {
       return;
     }
-    generateContract(button.dataset.sourceRow, button.dataset.language, button);
+    generateContract(button.dataset.dataKey, button.dataset.language, button);
   });
 }
 

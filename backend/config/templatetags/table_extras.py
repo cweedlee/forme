@@ -7,5 +7,12 @@ register = template.Library()
 
 
 @register.filter
-def get_item(mapping: dict[str, Any], key: str) -> Any:
-    return mapping.get(key)
+def get_item(value: Any, key: Any) -> Any:
+    if isinstance(value, dict):
+        return value.get(key)
+    if isinstance(value, (list, tuple)):
+        try:
+            return value[int(key)]
+        except (TypeError, ValueError, IndexError):
+            return None
+    return None
