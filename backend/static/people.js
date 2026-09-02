@@ -19,6 +19,16 @@ function setStatus(message, mode = "idle") {
   refreshStatus.dataset.mode = mode;
 }
 
+function formatCellValue(key, value) {
+  if (!value) return value ?? "";
+
+  if (key === "tax_rate" && typeof value === "number") {
+    return `${(value * 100).toFixed(2)}%`;
+  }
+
+  return value;
+}
+
 function textCell(tagName, value, className = "") {
   const cell = document.createElement(tagName);
   if (className) {
@@ -68,8 +78,14 @@ function renderTable(data) {
       actionCell.appendChild(generateButton(row.source_row, "eng", "영문"));
     }
     tableRow.appendChild(actionCell);
-    for (const value of row.values) {
-      tableRow.appendChild(textCell("td", value));
+    for (let i = 0; i < row.values.length; i++) {
+      const key = data.fieldKeys?.[i] ?? null;
+      const value = formatCellValue(key, row.values[i]);
+      const cell = textCell("td", value);
+      if (key) {
+        cell.dataset.key = key;
+      }
+      tableRow.appendChild(cell);
     }
     for (const column of data.decisionColumns) {
       tableRow.appendChild(textCell("td", row.decisions[column], "decision-cell"));

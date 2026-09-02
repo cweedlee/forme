@@ -28,6 +28,57 @@ class PersonSourceRowTests(SimpleTestCase):
         self.assertEqual(person.residence_country, "대한민국")
         self.assertEqual(person.country_code, "")
 
+    def test_parse_person_source_row_maps_code_style_headers(self):
+        person = parse_person_source_row(
+            source_row=10,
+            headers=["key", "person-name-kor", "person-name-eng", "residence-country"],
+            values=["N01", "민소연", "Soyeon Min", "대한민국"],
+            engagement_type="nominator",
+        )
+
+        self.assertEqual(person.key, "N01")
+        self.assertEqual(person.name.kor, "민소연")
+        self.assertEqual(person.name.eng, "Soyeon Min")
+        self.assertEqual(person.residence_country, "대한민국")
+
+    def test_read_nominator_source_values_accepts_code_style_headers(self):
+        person = parse_person_source_row(
+            source_row=10,
+            headers=[
+                "key",
+                "person-name-kor",
+                "person-name-eng",
+                "residence-country",
+                "work-location",
+                "gross-amount",
+                "income-type",
+                "tax-rate",
+                "tax-amount",
+                "final-amount",
+                "contract-date",
+            ],
+            values=[
+                "N01",
+                "민소연",
+                "Soyeon Min",
+                "대한민국",
+                "대한민국",
+                500000,
+                "기타소득",
+                0.088,
+                44000,
+                456000,
+                "2026-01-01",
+            ],
+            engagement_type="nominator",
+        )
+
+        source_values = read_nominator_source_values(person)
+
+        self.assertEqual(source_values["contract_date"], "2026-01-01")
+        self.assertEqual(source_values["tax_residence"], "대한민국")
+        self.assertEqual(source_values["tax_rate"], 0.088)
+
 
 class NominatorContractContextTests(SimpleTestCase):
     def test_source_values_are_read_from_excel_row_headers(self):

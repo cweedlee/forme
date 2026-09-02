@@ -56,6 +56,7 @@ def nominator_data(_: HttpRequest) -> JsonResponse:
             "workbookPath": str(table.workbook_path),
             "metadata": table.metadata,
             "columns": table.columns,
+            "fieldKeys": table.field_keys,
             "decisionColumns": table.decision_columns,
             "rows": table.rows,
             "rowCount": len(table.rows),
