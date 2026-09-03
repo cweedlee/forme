@@ -10,7 +10,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.cache import never_cache
 
 from config.services.contract_generation import generate_contract_for_person
-from config.services.nominator_source import load_nominator_person_from_workbook, load_nominator_table
+from config.services.nominator_source import NominatorContractTable
 from config.services.project_settings import load_project_config
 
 
@@ -27,10 +27,10 @@ def index(request: HttpRequest):
 @never_cache
 def nominator(request: HttpRequest):
     project_config = load_project_config()
-    table = load_nominator_table(project_config.workbook_path)
+    table = NominatorContractTable.from_workbook(project_config.workbook_path).build()
     return render(
         request,
-        "nominator.html",
+        "nominator/index.html",
         {
             "table": table,
             "row_count": len(table.rows),
@@ -43,7 +43,7 @@ def nominator(request: HttpRequest):
 @never_cache
 def nominator_data(_: HttpRequest) -> JsonResponse:
     project_config = load_project_config()
-    table = load_nominator_table(project_config.workbook_path)
+    table = NominatorContractTable.from_workbook(project_config.workbook_path).build()
     response = JsonResponse(
         {
             "sheetName": table.sheet_name,
@@ -74,10 +74,9 @@ def generate_nominator_contract(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "errors": ["dataKey 값이 필요합니다."]}, status=400)
 
     project_config = load_project_config()
-    person = load_nominator_person_from_workbook(
-        project_config.workbook_path,
-        data_key,
-    )
+    person = NominatorContractTable.from_workbook(
+        project_config.workbook_path
+    ).load_person(data_key)
     if not person:
         return JsonResponse(
             {"ok": False, "errors": [f"data-key {data_key}에서 참여자 객체를 만들 수 없습니다."]},

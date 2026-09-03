@@ -2,7 +2,7 @@ from typing import Any
 
 from config.services.contract_generation import optional_clause_value, person_name_for_language
 from config.services.country_codes import resolve_country_code
-from config.services.person_rows import PersonSourceRow
+from config.services.person_rows import PersonSourceRow, find_header_value
 
 
 NOMINATOR_CONTEXT_FIELDS = {
@@ -86,24 +86,11 @@ def require_value(value: Any, field_name: str):
 def read_nominator_source_values(person: PersonSourceRow) -> dict[str, Any]:
     return {
         field_name: require_value(
-            _mapped_value(person.raw_by_header, aliases),
+            find_header_value(person.raw_by_header, aliases),
             field_name,
         )
         for field_name, aliases in NOMINATOR_CONTEXT_FIELDS.items()
     }
-
-
-def _mapped_value(row: dict[str, Any], aliases: set[str]) -> Any:
-    normalized_aliases = {_normalize_header(alias) for alias in aliases}
-    for header, value in row.items():
-        if _normalize_header(header) in normalized_aliases:
-            return value
-    return None
-
-
-def _normalize_header(value: Any) -> str:
-    return str(value or "").strip().replace("-", "_").lower()
-
 
 # 000,000,000 단위로 숫자 포맷팅
 def _format_number(value: Any) -> str:

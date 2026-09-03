@@ -34,9 +34,9 @@ class PersonSourceRow:
 
 
 def is_person_code_header_row(values: list[Any]) -> bool:
-    labels = {_normalize_header(str(value or "").strip()) for value in values}
+    labels = {normalize_header(str(value or "").strip()) for value in values}
     return all(
-        labels & {_normalize_header(alias) for alias in HEADER_ALIASES[field_name]}
+        labels & {normalize_header(alias) for alias in HEADER_ALIASES[field_name]}
         for field_name in REQUIRED_FIELDS
     )
 
@@ -74,16 +74,19 @@ def _row_by_header(headers: list[str], values: list[Any]) -> dict[str, Any]:
 
 
 def _find_value(row: dict[str, Any], field_name: str) -> Any:
+    return find_header_value(row, HEADER_ALIASES[field_name])
+
+
+def normalize_header(value: Any) -> str:
+    return str(value or "").strip().replace("-", "_").lower()
+
+
+def find_header_value(row: dict[str, Any], aliases: set[str]) -> Any:
+    normalized_aliases = {normalize_header(alias) for alias in aliases}
     for header, value in row.items():
-        normalized_header = _normalize_header(header)
-        aliases = {_normalize_header(alias) for alias in HEADER_ALIASES[field_name]}
-        if normalized_header in aliases:
+        if normalize_header(header) in normalized_aliases:
             return value
     return None
-
-
-def _normalize_header(value: str) -> str:
-    return str(value or "").strip().replace("-", "_").lower()
 
 
 def _optional_str(value: Any) -> str | None:

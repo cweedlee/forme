@@ -3,6 +3,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from config.services.person_rows import normalize_header
 from config.services.project_settings import load_project_config
 
 
@@ -66,7 +67,7 @@ def parse_country_code_rows(rows: list[list[Any]]) -> dict[str, str]:
 
 def find_country_code_header(rows: list[list[Any]]) -> tuple[int, int, int]:
     for row_index, row in enumerate(rows[:10]):
-        normalized = [_normalize_header(value) for value in row]
+        normalized = [normalize_header(value) for value in row]
         name_index = _first_index(normalized, COUNTRY_NAME_HEADERS)
         code_index = _first_index(normalized, COUNTRY_CODE_HEADERS)
         if name_index is not None and code_index is not None:
@@ -75,7 +76,7 @@ def find_country_code_header(rows: list[list[Any]]) -> tuple[int, int, int]:
 
 
 def _first_index(values: list[str], accepted: set[str]) -> int | None:
-    normalized_accepted = {_normalize_header(value) for value in accepted}
+    normalized_accepted = {normalize_header(value) for value in accepted}
     for index, value in enumerate(values):
         if value in normalized_accepted:
             return index
@@ -88,7 +89,3 @@ def _cell(row: list[Any], index: int) -> Any:
 
 def _normalize(value: Any) -> str:
     return str(value or "").strip()
-
-
-def _normalize_header(value: Any) -> str:
-    return str(value or "").strip().replace("-", "_").lower()

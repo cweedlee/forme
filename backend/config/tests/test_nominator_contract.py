@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from django.test import SimpleTestCase
 
 from config.services.contract_generation import build_output_path, optional_clause_value, person_name_for_language
@@ -8,7 +10,8 @@ from config.services.nominator_contract import (
     require_value,
     validate_nominator_person,
 )
-from config.services.nominator_source import build_row_decisions
+from config.services.nominator_source import NominatorContractTable
+from config.services.original_source import TableData, TableRow
 from config.services.person_rows import PersonName, PersonSourceRow, parse_person_source_row
 
 
@@ -29,6 +32,38 @@ class PersonSourceRowTests(SimpleTestCase):
         self.assertEqual(person.country_code, "")
 
 
+class NominatorContractTableTests(SimpleTestCase):
+    def setUp(self):
+        self.table = NominatorContractTable(
+            Path("source.xlsx"),
+            TableData(
+                sheet_name="Nominator",
+                keys={"key": "식별자", "person-name-kor": "국문 성명"},
+                data=[
+                    TableRow(
+                        data_key="N01",
+                        source_row=10,
+                        values={"key": "N01", "person-name-kor": "민소연"},
+                    )
+                ],
+                metadata={},
+            ),
+        )
+
+    def test_load_person_uses_data_key(self):
+        person = self.table.load_person("N01")
+
+        self.assertIsNotNone(person)
+        self.assertEqual(person.key, "N01")
+        self.assertEqual(person.source_row, 10)
+
+    def test_build_returns_contract_table_view_model(self):
+        result = self.table.build()
+
+        self.assertEqual(result.field_keys, ["key", "person-name-kor"])
+        self.assertEqual(result.rows[0]["data_key"], "N01")
+
+
 class NominatorContractContextTests(SimpleTestCase):
     def test_source_values_are_read_from_excel_row_headers(self):
         values = read_nominator_source_values(_person())
@@ -43,7 +78,7 @@ class NominatorContractContextTests(SimpleTestCase):
         self.assertEqual(values["final_amount"], 456000)
 
     def test_row_decision_uses_excel_values_not_rules(self):
-        decision = build_row_decisions(_person())
+        decision = _contract_table().build_decisions(_person())
 
         self.assertEqual(decision["계약서 상태"], "READY")
         self.assertEqual(decision["검증 메시지"], "Excel 계산값 사용")
@@ -75,7 +110,7 @@ class NominatorContractContextTests(SimpleTestCase):
     def test_missing_required_context_value_is_error(self):
         person = _person(raw_by_header={"식별자": "N01"})
 
-        decision = build_row_decisions(person)
+        decision = _contract_table().build_decisions(person)
 
         self.assertEqual(decision["계약서 상태"], "ERROR")
         self.assertIn("gross_amount", decision["검증 메시지"])
@@ -159,4 +194,11 @@ def _person(
         country_code="",
         residence_country=str(row.get("세법상 거주국") or "대한민국"),
         workplace=str(row.get("업무수행장소") or "대한민국"),
+    )
+
+
+def _contract_table() -> NominatorContractTable:
+    return NominatorContractTable(
+        Path("source.xlsx"),
+        TableData(sheet_name="Nominator", keys={}, data=[], metadata={}),
     )
