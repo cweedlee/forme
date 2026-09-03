@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>UnfoldX Nominator</title>
+    <title>{% block document_title %}UnfoldX Contracts{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'people.css' %}">
   </head>
   <body>
@@ -18,7 +18,7 @@
     >
       <header class="toolbar">
         <div>
-          <h1>UnfoldX Nominator</h1>
+          <h1>{% block page_heading %}UnfoldX Contracts{% endblock %}</h1>
           <p id="tableMeta">{{ table.sheet_name }} · {{ row_count }} rows</p>
         </div>
         <div class="actions">
@@ -43,48 +43,44 @@
         <code id="sourceMode">{{ table.metadata.source_mode }}</code>
       </section>
 
-      <section class="table-wrap" aria-label="Nominator source table">
+      <section class="table-wrap" aria-label="Contract source table">
         <table id="peopleTable">
           <thead>
             <tr>
+              <th class="decision-head">계약서</th>
               {% for column in table.columns %}
-                {% if forloop.counter0 != 10 and forloop.counter0 != 11 %}
-                  <th>{{ column }}</th>
-                {% endif %}
+                <th>{{ column }}</th>
               {% endfor %}
               {% for column in table.decision_columns %}
                 <th class="decision-head">{{ column }}</th>
               {% endfor %}
-              <th class="decision-head">계약서</th>
             </tr>
           </thead>
           <tbody>
             {% for row in table.rows %}
               <tr>
-                {% for value in row|get_item:"values" %}
-                  {% if forloop.counter0 != 10 and forloop.counter0 != 11 %}
-                    <td
-                      class="cell-value"
-                      data-column="{{ table.columns|get_item:forloop.counter0 }}"
-                      data-key="{{ table.field_keys|get_item:forloop.counter0|default_if_none:'' }}"
-                    >{{ value|default_if_none:"" }}</td>
+                <td class="generate-actions">
+                  {% if row|get_item:"person" %}
+                    <button class="generate-button" type="button" data-data-key="{{ row|get_item:"data_key" }}" data-language="kor">국문</button>
+                    <button class="generate-button" type="button" data-data-key="{{ row|get_item:"data_key" }}" data-language="eng">영문</button>
                   {% endif %}
+                </td>
+                {% for value in row|get_item:"values" %}
+                  <td
+                    class="cell-value"
+                    data-column="{{ table.columns|get_item:forloop.counter0 }}"
+                    data-key="{{ table.field_keys|get_item:forloop.counter0|default_if_none:'' }}"
+                  >{{ value|default_if_none:"" }}</td>
                 {% endfor %}
                 {% with decisions=row|get_item:"decisions" %}
                   {% for column in table.decision_columns %}
                     <td class="decision-cell">{{ decisions|get_item:column|default_if_none:"" }}</td>
                   {% endfor %}
                 {% endwith %}
-                  <td class="decision-cell">
-                  {% if row|get_item:"person" %}
-                    <button class="generate-button" type="button" data-data-key="{{ row|get_item:"data_key" }}" data-language="kor">국문</button>
-                    <button class="generate-button" type="button" data-data-key="{{ row|get_item:"data_key" }}" data-language="eng">영문</button>
-                  {% endif %}
-                </td>
               </tr>
             {% empty %}
               <tr>
-                <td colspan="{{ table.columns|length|add:table.decision_columns|length }}" class="empty">표시할 행이 없습니다.</td>
+                <td colspan="{{ table.columns|length|add:table.decision_columns|length|add:2 }}" class="empty">표시할 행이 없습니다.</td>
               </tr>
             {% endfor %}
           </tbody>

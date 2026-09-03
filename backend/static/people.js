@@ -7,8 +7,8 @@ const sourceMode = document.getElementById("sourceMode");
 const peopleTable = document.getElementById("peopleTable");
 const healthCheckButton = document.getElementById("healthCheckButton");
 const contractPage = document.getElementById("contractPage");
-const dataUrl = contractPage?.dataset.dataUrl ?? "/nominator/data/";
-const generateUrl = contractPage?.dataset.generateUrl ?? "/nominator/generate/";
+const dataUrl = contractPage?.dataset.dataUrl ?? "";
+const generateUrl = contractPage?.dataset.generateUrl ?? "";
 const healthUrl = contractPage?.dataset.healthUrl ?? "/health/";
 
 function setStatus(message, mode = "idle") {

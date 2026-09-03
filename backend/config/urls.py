@@ -1,4 +1,3 @@
-from django.contrib import admin
 import json
 
 from django.http import HttpRequest, JsonResponse
@@ -10,7 +9,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.cache import never_cache
 
 from config.services.contract_generation import generate_contract_for_person
-from config.services.nominator_source import NominatorContractTable
+from config.services.contract_pages import get_contract_page
 from config.services.project_settings import load_project_config
 
 
@@ -25,25 +24,36 @@ def index(request: HttpRequest):
 
 @ensure_csrf_cookie
 @never_cache
-def nominator(request: HttpRequest):
+def contract_page(request: HttpRequest, contract_type: str):
+    page = get_contract_page(contract_type)
+    if page is None:
+        return JsonResponse({"ok": False, "errors": ["지원하지 않는 계약 유형입니다."]}, status=404)
+
     project_config = load_project_config()
-    table = NominatorContractTable.from_workbook(project_config.workbook_path).build()
+    table = page.table_class.from_workbook(project_config.workbook_path).build()
     return render(
         request,
-        "nominator/index.html",
+        page.template_name,
         {
             "table": table,
             "row_count": len(table.rows),
-            "data_url": reverse("nominator_data"),
-            "generate_url": reverse("nominator_generate"),
+            "data_url": reverse("contract_data", kwargs={"contract_type": contract_type}),
+            "generate_url": reverse(
+                "contract_generate",
+                kwargs={"contract_type": contract_type},
+            ),
         },
     )
 
 
 @never_cache
-def nominator_data(_: HttpRequest) -> JsonResponse:
+def contract_data(_: HttpRequest, contract_type: str) -> JsonResponse:
+    page = get_contract_page(contract_type)
+    if page is None:
+        return JsonResponse({"ok": False, "errors": ["지원하지 않는 계약 유형입니다."]}, status=404)
+
     project_config = load_project_config()
-    table = NominatorContractTable.from_workbook(project_config.workbook_path).build()
+    table = page.table_class.from_workbook(project_config.workbook_path).build()
     response = JsonResponse(
         {
             "sheetName": table.sheet_name,
@@ -60,9 +70,13 @@ def nominator_data(_: HttpRequest) -> JsonResponse:
 
 
 @never_cache
-def generate_nominator_contract(request: HttpRequest) -> JsonResponse:
+def generate_contract(request: HttpRequest, contract_type: str) -> JsonResponse:
     if request.method != "POST":
         return JsonResponse({"ok": False, "errors": ["POST만 허용됩니다."]}, status=405)
+
+    page = get_contract_page(contract_type)
+    if page is None:
+        return JsonResponse({"ok": False, "errors": ["지원하지 않는 계약 유형입니다."]}, status=404)
 
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -74,7 +88,7 @@ def generate_nominator_contract(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "errors": ["dataKey 값이 필요합니다."]}, status=400)
 
     project_config = load_project_config()
-    person = NominatorContractTable.from_workbook(
+    person = page.table_class.from_workbook(
         project_config.workbook_path
     ).load_person(data_key)
     if not person:
@@ -101,15 +115,20 @@ def static_file(request: HttpRequest, path: str):
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # 사용자 접속 페이지
     path("", index, name="index"),
+    path("contracts/<str:contract_type>/", contract_page, name="contract_page"),
+
+    # 내부 API
     path("health/", health, name="health"),
-    path("nominator/", nominator, name="nominator"),
-    path("nominator/data/", nominator_data, name="nominator_data"),
-    path("nominator/generate/", generate_nominator_contract, name="nominator_generate"),
-    path("people/", nominator, name="people"),
-    path("people/data/", nominator_data, name="people_data"),
-    path("people/generate/", generate_nominator_contract, name="generate_people_contract"),
+    path("contracts/<str:contract_type>/data/", contract_data, name="contract_data"),
+    path(
+        "contracts/<str:contract_type>/generate/",
+        generate_contract,
+        name="contract_generate",
+    ),
+
+    # 정적 파일
     path(
         "static/<path:path>",
         static_file,

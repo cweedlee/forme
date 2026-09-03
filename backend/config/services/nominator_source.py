@@ -1,6 +1,5 @@
-from pathlib import Path
 from config.services.contract_table import ContractTable
-from config.services.original_source import TableRow, load_table
+from config.services.original_source import TableRow
 from config.services.person_rows import PersonSourceRow, find_header_value, parse_person_source_row
 
 
@@ -22,13 +21,6 @@ REQUIRED_CONTEXT_FIELDS = {
 class NominatorContractTable(ContractTable):
     engagement_type = ENGAGEMENT_TYPE
     decision_columns = DECISION_COLUMNS
-
-    @classmethod
-    def from_workbook(cls, workbook_path: Path) -> "NominatorContractTable":
-        return cls(
-            workbook_path,
-            load_table(cls.engagement_type, workbook_path),
-        )
 
     def parse_person(self, row: TableRow) -> PersonSourceRow:
         return parse_person_source_row(

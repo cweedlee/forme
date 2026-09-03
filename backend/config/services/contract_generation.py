@@ -78,10 +78,6 @@ def generate_contract_for_person(person: PersonSourceRow, language: str = "kor")
     return ContractGenerationResult(ok=True, output_path=str(output_path))
 
 
-def generate_nominator_contract(person: PersonSourceRow, language: str = "kor") -> ContractGenerationResult:
-    return generate_contract_for_person(person, language)
-
-
 def build_contract_context(person: PersonSourceRow, language: str) -> dict[str, object]:
     if person.engagement_type == "nominator":
         from config.services.nominator_contract import build_nominator_context
